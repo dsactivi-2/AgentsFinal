@@ -2,23 +2,21 @@
 
 ## Zweck
 
-Dieses Dokument definiert die Agentenrollen, ihre Verantwortlichkeiten, Grenzen, Übergaben, Werkzeuge und Qualitätsregeln.
+Dieses Dokument ist die Architektur-Spezifikation der 9 Verhaltensrollen von **Ava** —
+dem einzigen Agenten (`agentId: main`) in diesem Stack.
 
-Es ist die operative Agenten-Spezifikation für den Stack aus:
+Stack-Komponenten:
+- OpenClaw · Postiz · mem0 · Redis · Postgres · Meta Bridge · Caddy
 
-- OpenClaw
-- Postiz
-- mem0
-- Redis
-- Postgres
-- Meta Bridge
-- Caddy
+**Wichtig:** Es gibt keinen separaten Agenten pro Rolle.
+Ava ist eine einzelne Instanz die je nach Kontext (Trigger, Cron, Webhook)
+in eine dieser 9 Rollen wechselt. Die Rollen-Logik für den laufenden Betrieb
+steht in `workspace/skills/{name}/SKILL.md`.
+Das Session-Protokoll (Routing, Ketten, Memory) steht in `config/AGENTS.md`.
 
-Die Grundidee lautet:
-
-> Kein einzelner Agent soll alles tun.
-
-Stattdessen werden Verantwortungen getrennt, damit Entscheidungen klarer, sicherer und leichter überprüfbar bleiben.
+Dieses Dokument hier beschreibt: Qualitätskriterien, Fehlerverhalten,
+Definition of Done, Tool-Zugriff und Freigaberegeln — für Architektur-Entscheidungen
+und zur Referenz.
 
 ---
 
