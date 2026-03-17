@@ -54,6 +54,13 @@
       "agentId": "main",
       "message": "ROLE:memory_critic — Wöchentliche Memory-Hygiene: Prüfe veraltete Einträge, dedupliziere Kampagnen-Learnings, verdichte wichtige Erkenntnisse.",
       "timezone": "Europe/Berlin"
+    },
+    {
+      "id": "reflexion-weekly",
+      "schedule": "0 4 * * 0",
+      "agentId": "main",
+      "message": "ROLE:reflexion — Wöchentliche Selbstreflexion: Analysiere letzte 7 Tage Outputs aller 9 Rollen (planner, writer, reviewer, publisher, analytics, optimizer, inbox, memory-critic, escalation). Welche performen gut, welche schlecht? Speichere skill_improvement Einträge pro Rolle + reflexion_report mit max 5 Bullet Points. Keine Skill-Dateien überschreiben — nur Vorschläge in Supermemory.",
+      "timezone": "Europe/Berlin"
     }
   ],
 
