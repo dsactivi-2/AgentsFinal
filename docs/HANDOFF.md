@@ -1,178 +1,201 @@
 # HANDOFF — AgentsFinal / Session 2026-03-17
 
-## Was in dieser Session gemacht wurde
+## Aktueller Stand (LIVE)
 
-Branch: `refactor/openclaw-conform` — 7 Commits auf GitHub
-
-| Commit | Was |
-|---|---|
-| `a680892` | 9 Skills migriert → `workspace/skills/{name}/SKILL.md + _meta.json` |
-| `b516813` | `config/skills/*.md` gelöscht, workspace-Pfad auf `workspace-social-ai` |
-| `e3255f5` | `config/AGENTS.md` → Generic Session Protocol (nicht mehr Rollendefinitionen) |
-| `96b1fb5` | `workspace/IDENTITY.md` erstellt — Ava, 9 Skills, Sprachen, Grenzen |
-| `fa532ce` | README + IDENTITY: Umbenennung auf AgentsFinal / Ava |
-| `48d31ec` | `docs/HANDOFF.md` erstellt |
-| `ed450b3` | `docs/AGENTS.md` Intro-Fix: ein Agent, 9 Verhaltensrollen |
-
-Remote: `git@github.com:dsactivi-2/AgentsFinal.git`
-Lokal: `/Users/dsselmanovic/backups/agents-final.git`
-Branch noch NICHT in `main` gemergt — PR steht aus.
-
-Beide Remotes identisch synchronisiert.
+**Branch:** `refactor/openclaw-conform` — 13 Commits auf GitHub
+**Repo:** `git@github.com:dsactivi-2/AgentsFinal.git`
+**Server:** `178.104.64.120` (Hetzner) | Tailscale: `marki` (`100.88.196.1`)
+**Dashboard:** `https://marki.ds.activi.io/#token=4b2a2952dd46ab0c1bb4ada6568d655c7197f881eefa5f18`
 
 ---
 
-## Was noch zu tun ist
+## Was vollständig erledigt ist ✅
 
-### Priorität 1 — Sofort nötig vor erstem echten Run
+### Server-Deployment
+| Was | Status |
+|---|---|
+| Ubuntu 24.04, 4 vCPU, 7.6 GB RAM, 150 GB Disk | ✅ |
+| Node.js v22, PostgreSQL 16, Redis 7 | ✅ installiert |
+| OpenClaw 2026.3.13 als systemd-Service | ✅ läuft & Autostart |
+| Caddy Reverse Proxy mit SSL (Let's Encrypt) | ✅ `marki.ds.activi.io` |
+| Tailscale verbunden (`marki`, `dsphone`, `mac-ds`) | ✅ |
+| DB Schema angewendet (`social_ai`) | ✅ alle Tabellen inkl. leads, lead_followups, error_logs |
+| Repo geklont nach `/root/social-ai` | ✅ |
 
-**A) Branch mergen**
+### OpenClaw Gateway
+| Was | Status |
+|---|---|
+| Gateway läuft auf Tailscale-IP `100.88.196.1:18789` | ✅ |
+| Caddy proxyt `https://marki.ds.activi.io` → Gateway | ✅ |
+| Primär-Modell: `ollama/glm-5:cloud` | ✅ |
+| Fallback 1: `ollama/minimax-m2.5:cloud` | ✅ |
+| Fallback 2: `ollama/kimi-k2.5:cloud` | ✅ |
+| Fallback 3: `ollama/leckminartor/qwen3.5-uncensored:397b-cloud` | ✅ |
+| Ollama Cloud API Key in systemd drop-in | ✅ |
+| Auth-Token konfiguriert | ✅ |
+
+### Agent (Ava) — Skills
+| Skill | Status |
+|---|---|
+| planner | ✅ |
+| writer | ✅ |
+| reviewer | ✅ |
+| publisher | ✅ |
+| analytics | ✅ |
+| optimizer | ✅ |
+| inbox | ✅ |
+| memory-critic | ✅ |
+| escalation | ✅ |
+| reflexion | ✅ |
+| lead-nurturing | ✅ |
+| ~~ads-manager~~ | ❌ bewusst entfernt (User will keine Ads) |
+
+### Wichtige Commits (neueste zuerst)
+| Commit | Was |
+|---|---|
+| `e9857d1` | Ads Manager entfernt, IDENTITY + SOUL bereinigt |
+| `b8b2766` | Ads Manager Skill (entfernt in nächstem Commit) |
+| `8931e84` | bootstrap.sh fix: workspace-social-ai + PID-Files |
+| `281a345` | Lead Nurturing Skill + 3 Crons + DB-Schema |
+| `7f89baa` | Reflexion Skill + Cron So 04:00 |
+
+---
+
+## Was noch NICHT fertig ist ⚠️
+
+### Priorität 1 — Blockiert den echten Betrieb
+
+**A) Meta-Tokens in `.env` eintragen**
+```
+/root/social-ai/services/meta-bridge/.env
+```
+Noch fehlende Werte:
+- `META_APP_SECRET` → developers.facebook.com → App → Einstellungen → App-Geheimnis
+- `META_VERIFY_TOKEN` → selbst wählen (beliebiger String, z.B. `ava-webhook-2026`)
+- `META_PAGE_ACCESS_TOKEN` → Messenger → API-Einstellungen → Token generieren
+- `ADMIN_PSID` → eigene Facebook PSID (erhält man wenn man dem Bot schreibt)
+
+**B) meta-bridge Service starten**
 ```bash
+ssh marki
+cd /root/social-ai
+bash scripts/start-meta-bridge.sh
+```
+Läuft auf Port `8085`, hört auf Webhook-Calls von Meta.
+
+**C) Supermemory API Key**
+```
+/root/social-ai/services/mem0-api/.env
+SUPERMEMORY_API_KEY=sm_...
+```
+Danach:
+```bash
+bash scripts/start-mem0-api.sh
+```
+
+**D) Facebook Webhook konfigurieren**
+- URL: `https://marki.ds.activi.io/hooks/meta`
+- Verify Token: (was du in META_VERIFY_TOKEN eingetragen hast)
+- Feld abonnieren: `messages`, `messaging_postbacks`
+- Konfigurieren unter: developers.facebook.com → App → Webhooks
+
+### Priorität 2 — Verbesserungen
+
+**E) Cron-Jobs im Gateway registrieren**
+Die 7 Crons (planner, analytics, memory-critic, reflexion, lead-nurturing x3) wurden aus der Config entfernt weil das Format geändert hat. Müssen via Dashboard oder API neu eingerichtet werden:
+- Dashboard → Agent → Scheduled Jobs
+
+**F) Branch mergen**
+```bash
+# auf Server oder lokal
+cd /root/social-ai
 git checkout main
 git merge refactor/openclaw-conform
 git push origin main
 ```
-Oder PR auf GitHub: `refactor/openclaw-conform → main`
 
-**B) Lokalen Workspace anlegen**
-```bash
-# OpenClaw-Workspace für diesen Stack erstellen
-mkdir -p ~/.openclaw/workspace-social-ai
-cp -r /pfad/zu/AgentsFinal/workspace/. ~/.openclaw/workspace-social-ai/
-cp /pfad/zu/AgentsFinal/config/SOUL.md ~/.openclaw/workspace-social-ai/
-cp /pfad/zu/AgentsFinal/config/AGENTS.md ~/.openclaw/workspace-social-ai/
-cp /pfad/zu/AgentsFinal/config/MEMORY.md ~/.openclaw/workspace-social-ai/
-cp /pfad/zu/AgentsFinal/config/HEARTBEAT.md ~/.openclaw/workspace-social-ai/
+**G) ADMIN_PSID herausfinden**
+1. meta-bridge starten
+2. Selbst eine Nachricht an die Facebook Page schreiben
+3. Im meta-bridge Log die PSID ablesen
+4. In `.env` als `ADMIN_PSID` eintragen
+5. meta-bridge neu starten
+
+---
+
+## Architektur-Übersicht
+
 ```
-→ Skills sind bereits in `workspace/skills/` — werden mitkopiert
+Internet
+  │
+  ▼
+marki.ds.activi.io:443 (Caddy + SSL)
+  │
+  ├─► :18789 OpenClaw Gateway (Tailscale)
+  │     └─► Agent "Ava" (glm-5:cloud)
+  │           └─► ~/.openclaw/workspace-social-ai/ (11 Skills)
+  │
+  └─► /hooks/meta → :8085 meta-bridge
+        └─► Facebook/Instagram Webhook
+              └─► OpenClaw Hook → Agent
 
-**C) openclaw.json deployen**
-```bash
-cp config/openclaw.json ~/.openclaw/workspace-social-ai/openclaw.json
-# Env-Vars setzen: OLLAMA_CLOUD_MODEL, OLLAMA_CLOUD_API_BASE, etc.
+Datenbank-Layer (localhost only):
+  - Redis :6379 — Session-State
+  - PostgreSQL :5432 — Logs, Leads, Audit
+
+Memory:
+  - memory-core (Workspace Markdown-Files)
+  - Supermemory (wenn API Key gesetzt)
 ```
 
 ---
 
-### Priorität 2 — Verbesserungen (kein Blocker)
+## Credentials & Zugänge
 
-**D) `docs/AGENTS.md` Intro-Fix** ✅ ERLEDIGT (Session 2026-03-17)
-- Intro wurde angepasst: "Ava ist eine einzelne Instanz die je nach Kontext in eine dieser 9 Rollen wechselt"
-- Falscher Satz "Kein einzelner Agent soll alles tun" entfernt
-
-**E) `workspace/SOUL.md` Symlink / Kopie**
-- Aktuell: SOUL.md liegt in `config/`, OpenClaw erwartet es im Workspace-Root
-- Fix: Bei Bootstrap-Script ins Workspace-Root kopieren oder Symlink
-
-**F) `workspace/TOOLS.md` erstellen**
-- OpenClaw erwartet TOOLS.md im Workspace
-- Inhalt: memory_search, memory_get, postiz API, meta-bridge, redis, postgres
-- Format: wie `~/.openclaw/workspace-marki/TOOLS.md`
-
-**G) `workspace/USER.md` erstellen**
-- Für User-Kontext (Firmenname, Branche, Zielgruppe, Sprache)
-- Platzhalter die beim Setup ausgefüllt werden
-
-**H) `scripts/bootstrap.sh` aktualisieren**
-- Aktuell kopiert es aus `config/` (alter Pfad)
-- Soll aus `workspace/` kopieren + Skills symlinken
-- PID-Files schreiben bereits erledigt (aus letzter Session)
-
-**I) Bundle-Struktur** (nur wenn zweiter Use Case kommt)
-- `bundles/social-media/bundle.yaml` + `scripts/install-bundle.sh`
-- Erst relevant wenn ein zweiter Agent (ecommerce, support-bot) gebaut wird
-
----
-
-## Supermemory — Welche Docs lesen
-
-Beim Session-Start diese Queries ausführen:
-
-```bash
-~/mem-search.sh "openclaw workspace structure"
-~/mem-search.sh "openclaw skill format SKILL.md"
-~/mem-search.sh "AgentsFinal social ai stack"
-~/mem-search.sh "openclaw.json configuration"
-~/mem-search.sh "meta-bridge mem0-api services"
-```
-
-Oder via Supermemory API (containerTag: `claude-code-memory`):
-- Query: `"openclaw workspace"` → Workspace-Aufbau-Doku
-- Query: `"social ai stack v2"` → Stack-Konfiguration
-- Query: `"SKILL.md format meta.json"` → Skill-Verzeichnis-Format
-
----
-
-## Skills die für nächste Session aktiviert werden sollten
-
-| Skill | Warum |
+| Was | Wert |
 |---|---|
-| `sessions-memory` | Supermemory-Queries + Memory-Protokoll für Session-Start |
-| `hooks-configuration` | Falls bootstrap.sh oder OpenClaw-Hooks angepasst werden |
-| `langchain-architecture` | Nur wenn Reflexion-Rolle (ROLE:reflexion) aus Plan A1 noch umgesetzt wird |
+| **Server SSH** | `ssh marki` (Alias) oder `ssh root@178.104.64.120` |
+| **Dashboard** | `https://marki.ds.activi.io/#token=4b2a2952dd46ab0c1bb4ada6568d655c7197f881eefa5f18` |
+| **Gateway Token** | `4b2a2952dd46ab0c1bb4ada6568d655c7197f881eefa5f18` |
+| **Ollama Cloud Key** | in `/root/social-ai/config/.env` + systemd drop-in |
+| **Ollama Base URL** | `https://ollama.com/api` |
+| **GitHub Repo** | `git@github.com:dsactivi-2/AgentsFinal.git` |
 
 ---
 
-## Nächste Agenten — Top 3 Empfehlungen
+## Wichtige Befehle auf dem Server
 
-### 1. Lead Nurturing Agent (höchster Impact, schnell baubar)
-Sendet automatische Follow-ups an warme Leads nach 24h / 3 Tage / 7 Tage.
-- **Nutzt:** meta-bridge (existiert), mem0 (existiert), PostgreSQL (existiert), Postiz (existiert)
-- **Neu nötig:** `workspace/skills/lead-nurturing/SKILL.md` (1 Datei)
-- **Trigger:** Cron 3x täglich → prüft PostgreSQL auf Leads ohne Antwort
-- **Impact:** Automatische Konversions-Optimierung ohne manuellen Aufwand
+```bash
+# Gateway Status
+systemctl --user status openclaw-gateway
 
-### 2. Reflexion Agent / ROLE:reflexion (bereits geplant in Plan A1)
-Wöchentliche Selbstanalyse aller 9 Rollen — was lief gut, was schlecht?
-- **Nutzt:** memory_search (existiert), Supermemory (existiert)
-- **Neu nötig:** `workspace/skills/reflexion/SKILL.md` (1 Datei) + Cron So 04:00 in openclaw.json
-- **Darf nicht:** Skill-Dateien selbst überschreiben — nur Vorschläge speichern
-- **Impact:** Langfristige Selbstverbesserung ohne manuelle Analyse
+# Gateway neu starten
+systemctl --user restart openclaw-gateway
 
-### 3. Content Recycling Agent (Mittel, aber hoher ROI)
-Analysiert Top-Posts der letzten 90 Tage und erstellt neue Varianten davon.
-- **Nutzt:** Postiz Analytics (existiert), writer (existiert), planner (existiert)
-- **Neu nötig:** `workspace/skills/content-recycler/SKILL.md` (1 Datei)
-- **Trigger:** Cron Mo 07:00 → Top 3 Posts der letzten 90 Tage → 3 neue Varianten
-- **Impact:** Bestehendes Erfolgs-Content wird maximal ausgeschöpft
+# Gateway Logs live
+journalctl --user -u openclaw-gateway -f
 
----
+# Agent Logs
+tail -f /tmp/openclaw/openclaw-2026-03-17.log
 
-## Offene Entscheidungen (User muss entscheiden)
+# Caddy Status
+systemctl status caddy
 
-1. **Agent-Name "Ava"** — behalten oder anderen Namen?
-2. **PR mergen** — wann? refactor/openclaw-conform → main
-3. ~~**`docs/AGENTS.md` Intro`**~~ ✅ erledigt
-4. **ROLE:reflexion (Cron So 04:00)** — noch aus dem ursprünglichen Plan (Teil A1) — wurde noch nicht implementiert
-5. **Welchen Agenten als nächstes bauen?** — Lead Nurturing / Reflexion / Content Recycler?
+# Dashboard URL
+openclaw dashboard --no-open
 
----
+# meta-bridge starten
+cd /root/social-ai && bash scripts/start-meta-bridge.sh
 
-## Repo-Zustand
-
+# mem0-api starten
+cd /root/social-ai && bash scripts/start-mem0-api.sh
 ```
-github.com/dsactivi-2/AgentsFinal
-├── main              ← initial commit (alt)
-└── refactor/openclaw-conform  ← AKTUELL (7 Commits voraus)
 
-Struktur:
-workspace/
-  IDENTITY.md   ✅ neu
-  skills/
-    analytics/SKILL.md + _meta.json   ✅
-    escalation/SKILL.md + _meta.json  ✅
-    inbox/SKILL.md + _meta.json       ✅
-    memory-critic/SKILL.md + _meta.json ✅
-    optimizer/SKILL.md + _meta.json   ✅
-    planner/SKILL.md + _meta.json     ✅
-    publisher/SKILL.md + _meta.json   ✅
-    reviewer/SKILL.md + _meta.json    ✅
-    writer/SKILL.md + _meta.json      ✅
-config/
-  AGENTS.md     ✅ Session Protocol (nicht mehr Rollendefinitionen)
-  openclaw.json ✅ workspace-social-ai
-  SOUL.md       (unverändert, gut)
-  HEARTBEAT.md  (unverändert)
-  MEMORY.md     (unverändert)
-.gitignore      ✅ erweitert
-```
+---
+
+## Offene Entscheidungen
+
+1. **Meta-Tokens** — User muss diese selbst aus dem Facebook Developer Portal holen
+2. **Supermemory Key** — User muss diesen aus supermemory.ai Dashboard holen
+3. **Cron-Jobs** — via Dashboard neu einrichten (7 Jobs: planner, analytics, memory-critic, reflexion, lead-nurturing x3)
+4. **Branch mergen** — `refactor/openclaw-conform` → `main` (PR oder direkt)

@@ -6,13 +6,20 @@ Neu in v2:
   - Postgres: Nachrichten-Logging (messages-Tabelle) + graceful fallback
   - Beide Backends sind optional; Bridge läuft auch ohne sie.
 
+Neu in v2.1:
+  - Error-Logging: Alle Fehler in error_logs-Tabelle + strukturiertes stderr
+  - Retry: Meta Graph API 2× mit Backoff (3s → 6s)
+  - Retry: OpenClaw 2× mit 5s Pause bei Timeout/Fehler
+
 Endpunkte:
-  GET  /webhook  → Meta Webhook-Verifikation
-  POST /webhook  → Eingehende Meta Events
-  POST /reply    → Interner Endpunkt für OpenClaw-Antworten
-  GET  /health   → Status aller Backends
+  GET  /webhook        → Meta Webhook-Verifikation
+  POST /webhook        → Eingehende Meta Events
+  POST /reply          → Interner Endpunkt für OpenClaw-Antworten
+  GET  /health         → Status aller Backends
+  GET  /admin/errors   → Letzte Fehler aus error_logs
 """
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -205,6 +212,34 @@ async def _log_message(
         log_error("db_log_failed", direction=direction, error=str(exc))
 
 
+# ─── Error-Logging in DB ────────────────────────────────────────────────────
+
+async def _log_error_to_db(
+    error_type: str,
+    error_msg: str,
+    request_id: str = "",
+    context: dict | None = None,
+) -> None:
+    """Schreibt Fehler in error_logs-Tabelle. Fehler stoppen nicht die Bridge."""
+    if not db_pool:
+        return
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO error_logs(service, error_type, error_msg, request_id, context)
+                VALUES ($1, $2, $3, $4, $5)
+                """,
+                "meta-bridge",
+                error_type,
+                error_msg,
+                request_id,
+                json.dumps(context or {}),
+            )
+    except Exception as exc:
+        log_error("error_log_write_failed", error=str(exc))
+
+
 # ─── Signatur-Verifikation ───────────────────────────────────────────────────
 
 def _verify_signature(body: bytes, signature_header: str | None) -> bool:
@@ -254,6 +289,31 @@ async def send_meta_message(
     except Exception as exc:
         log_error("meta_send_exception", error=str(exc))
         return False
+
+
+async def _send_meta_with_retry(
+    psid: str,
+    platform: str,
+    text: str,
+    request_id: str | None = None,
+    max_retries: int = 2,
+) -> bool:
+    """Sendet Meta-Nachricht mit exponentiellem Backoff (3s → 6s). Logt nach Erschöpfung."""
+    for attempt in range(max_retries + 1):
+        ok = await send_meta_message(psid, text, platform=platform, request_id=request_id)
+        if ok:
+            return True
+        if attempt < max_retries:
+            delay = 3 * (2 ** attempt)  # 3s, 6s
+            log_error("meta_send_retry", attempt=attempt + 1, delay_s=delay, psid=psid[:8] + "***")
+            await asyncio.sleep(delay)
+    await _log_error_to_db(
+        "meta_send_exhausted",
+        f"All {max_retries + 1} attempts failed",
+        request_id=request_id or "",
+        context={"psid_prefix": psid[:8], "platform": platform},
+    )
+    return False
 
 
 # ─── Payload-Normalisierung ──────────────────────────────────────────────────
@@ -358,57 +418,78 @@ async def _process_event(event: dict, request_id: str) -> None:
 
     reply_text: str | None = None
 
-    try:
-        async with httpx.AsyncClient(timeout=OPENCLAW_TIMEOUT) as client:
-            resp = await client.post(OPENCLAW_HOOK_URL, json=openclaw_payload)
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=OPENCLAW_TIMEOUT) as client:
+                resp = await client.post(OPENCLAW_HOOK_URL, json=openclaw_payload)
 
-        elapsed = round(time.monotonic() - t0, 2)
+            elapsed = round(time.monotonic() - t0, 2)
 
-        if resp.status_code == 200:
-            try:
-                data = resp.json()
-                reply_text = (
-                    data.get("text")
-                    or data.get("reply")
-                    or data.get("response")
-                    or data.get("content")
+            if resp.status_code == 200:
+                try:
+                    data = resp.json()
+                    reply_text = (
+                        data.get("text")
+                        or data.get("reply")
+                        or data.get("response")
+                        or data.get("content")
+                    )
+                    if not reply_text and isinstance(data, str):
+                        reply_text = data
+                except Exception:
+                    raw = resp.text.strip()
+                    if raw:
+                        reply_text = raw
+
+                log(
+                    "openclaw_ok",
+                    request_id=request_id,
+                    elapsed_s=elapsed,
+                    has_reply=bool(reply_text),
                 )
-                if not reply_text and isinstance(data, str):
-                    reply_text = data
-            except Exception:
-                raw = resp.text.strip()
-                if raw:
-                    reply_text = raw
+                break  # Erfolgreich — kein Retry nötig
+            else:
+                log_error(
+                    "openclaw_error",
+                    request_id=request_id,
+                    status=resp.status_code,
+                    body=resp.text[:200],
+                    elapsed_s=elapsed,
+                )
+                if attempt == 1:
+                    await _log_error_to_db(
+                        "openclaw_error_exhausted",
+                        f"HTTP {resp.status_code}",
+                        request_id=request_id,
+                        context={"status": resp.status_code},
+                    )
 
-            log(
-                "openclaw_ok",
+        except httpx.TimeoutException:
+            log_error("openclaw_timeout", request_id=request_id, timeout_s=OPENCLAW_TIMEOUT, attempt=attempt + 1)
+            if attempt == 0:
+                await asyncio.sleep(5)
+            else:
+                await _log_error_to_db(
+                    "openclaw_timeout_exhausted",
+                    f"Timeout after {OPENCLAW_TIMEOUT}s (2 attempts)",
+                    request_id=request_id,
+                )
+        except Exception as exc:
+            log_error("openclaw_exception", request_id=request_id, error=str(exc))
+            await _log_error_to_db(
+                "openclaw_exception",
+                str(exc)[:500],
                 request_id=request_id,
-                elapsed_s=elapsed,
-                has_reply=bool(reply_text),
             )
-        else:
-            log_error(
-                "openclaw_error",
-                request_id=request_id,
-                status=resp.status_code,
-                body=resp.text[:200],
-                elapsed_s=elapsed,
-            )
-
-    except httpx.TimeoutException:
-        log_error("openclaw_timeout", request_id=request_id, timeout_s=OPENCLAW_TIMEOUT)
-    except Exception as exc:
-        log_error("openclaw_exception", request_id=request_id, error=str(exc))
+            break  # Unbekannter Fehler — kein Retry
 
     if reply_text:
-        await send_meta_message(
-            psid, reply_text, platform=platform, request_id=request_id
-        )
+        await _send_meta_with_retry(psid, platform, reply_text, request_id=request_id)
 
 
 # ─── FastAPI App ──────────────────────────────────────────────────────────────
 
-app = FastAPI(title="meta-bridge", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="meta-bridge", version="2.1.0", lifespan=lifespan)
 
 
 @app.get("/health")
@@ -417,10 +498,42 @@ async def health() -> dict:
     return {
         "ok": True,
         "service": "meta-bridge",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "redis": redis_client is not None,
         "postgres": db_pool is not None,
     }
+
+
+@app.get("/admin/errors")
+async def get_errors(limit: int = 50) -> dict:
+    """Letzte Fehler aus error_logs-Tabelle (meta-bridge). Auth: intern only."""
+    if not db_pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+    limit = min(max(1, limit), 200)
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id, error_type, error_msg, request_id, context, resolved, created_at
+            FROM error_logs
+            WHERE service = 'meta-bridge'
+            ORDER BY created_at DESC
+            LIMIT $1
+            """,
+            limit,
+        )
+    errors = [
+        {
+            "id": str(r["id"]),
+            "error_type": r["error_type"],
+            "error_msg": r["error_msg"],
+            "request_id": r["request_id"],
+            "context": json.loads(r["context"]) if r["context"] else {},
+            "resolved": r["resolved"],
+            "created_at": r["created_at"].isoformat(),
+        }
+        for r in rows
+    ]
+    return {"ok": True, "count": len(errors), "errors": errors}
 
 
 @app.get("/webhook", response_class=PlainTextResponse)

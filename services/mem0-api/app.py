@@ -12,13 +12,16 @@ Endpunkte:
   GET  /health          → Dienststatus
 """
 
+import json
 import logging
 import os
+import time
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 # ─── Logging ────────────────────────────────────────────────────────────────
 
@@ -55,11 +58,28 @@ async def _sm_post(path: str, payload: dict) -> dict:
             headers=_headers(),
         )
     if resp.status_code not in (200, 201):
+        logger.error(json.dumps({
+            "event": "supermemory_error",
+            "status": resp.status_code,
+            "path": path,
+            "ts": time.time(),
+        }))
         raise HTTPException(
             status_code=502,
             detail=f"Supermemory error {resp.status_code}: {resp.text[:200]}",
         )
     return resp.json()
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=2, max=10),
+    retry=retry_if_exception_type(httpx.TimeoutException),
+    reraise=True,
+)
+async def _sm_post_with_retry(path: str, payload: dict) -> dict:
+    """_sm_post mit Tenacity-Retry bei Timeouts (3 Versuche, 2s/4s/8s Backoff)."""
+    return await _sm_post(path, payload)
 
 
 async def _sm_delete(path: str) -> dict:
@@ -145,7 +165,7 @@ async def add_memory(req: AddRequest) -> dict:
         },
     }
 
-    result = await _sm_post("/documents", payload)
+    result = await _sm_post_with_retry("/documents", payload)
     doc_id = result.get("id") or result.get("documentId", "unknown")
 
     logger.info(f"memory_add user={req.user_id[:8]}*** doc_id={doc_id}")
@@ -166,7 +186,7 @@ async def search_memory(req: SearchRequest) -> dict:
         "containerTags": [CONTAINER_TAG, f"user:{req.user_id}"],
     }
 
-    result = await _sm_post("/search", payload)
+    result = await _sm_post_with_retry("/search", payload)
     hits = result.get("results", [])
 
     logger.info(
@@ -191,7 +211,7 @@ async def get_memories(user_id: str) -> dict:
         "containerTags": [CONTAINER_TAG, f"user:{user_id}"],
     }
 
-    result = await _sm_post("/search", payload)
+    result = await _sm_post_with_retry("/search", payload)
     hits = result.get("results", [])
 
     logger.info(f"memory_get_all user={user_id[:8]}*** count={len(hits)}")

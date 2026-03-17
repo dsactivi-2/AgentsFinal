@@ -240,6 +240,22 @@ CREATE INDEX IF NOT EXISTS idx_lead_followups_sent_at ON lead_followups(sent_at 
 CREATE INDEX IF NOT EXISTS idx_lead_followups_delivered ON lead_followups(delivered) WHERE delivered = FALSE;
 
 -- =============================================================================
+-- error_logs — Strukturiertes Fehler-Logging für alle Services
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS error_logs (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    service     TEXT NOT NULL,         -- 'meta-bridge' | 'mem0-api'
+    error_type  TEXT NOT NULL,         -- 'openclaw_timeout' | 'meta_send_failed' | 'supermemory_error'
+    error_msg   TEXT,
+    request_id  TEXT,
+    context     JSONB DEFAULT '{}',
+    resolved    BOOLEAN DEFAULT FALSE,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_error_logs_service_time ON error_logs(service, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_error_logs_type_resolved ON error_logs(error_type, resolved);
+
+-- =============================================================================
 -- Kommentare / Abschluss
 -- =============================================================================
 COMMENT ON TABLE messages IS 'Alle ein- und ausgehenden Nachrichten über alle Plattformen';

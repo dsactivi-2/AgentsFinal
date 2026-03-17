@@ -1,7 +1,7 @@
 # AGENTS.md — Session Protocol
 
 Dieser Agent ist eine **einzelne Instanz** (`agentId: main`).
-Er nimmt je nach Kontext eine von 9 Verhaltensrollen ein (Skills).
+Er nimmt je nach Kontext eine von 11 Verhaltensrollen ein (Skills).
 Die Rollen-Logik steht in `workspace/skills/{name}/SKILL.md`.
 
 ---
@@ -22,6 +22,7 @@ Die Rollen-Logik steht in `workspace/skills/{name}/SKILL.md`.
 | Cron 09:00 täglich | `ROLE:planner` |
 | Cron 20:00 täglich | `ROLE:analytics` |
 | Cron 03:00 sonntags | `ROLE:memory_critic` |
+| Cron 04:00 sonntags | `ROLE:reflexion` |
 | Nutzer: "erstelle Post / Plan" | `ROLE:planner` |
 | Nutzer: "schreibe..." | `ROLE:writer` |
 | Nutzer: "prüfe / review" | `ROLE:reviewer` |
