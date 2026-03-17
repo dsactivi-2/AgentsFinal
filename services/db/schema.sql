@@ -190,6 +190,56 @@ CREATE TRIGGER update_posts_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- =============================================================================
+-- leads — Warme Leads für automatisches Follow-up-Nurturing
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS leads (
+    id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    psid             VARCHAR(128)  NOT NULL,
+    platform         VARCHAR(32)   NOT NULL CHECK (platform IN ('messenger', 'instagram', 'whatsapp', 'telegram', 'test')),
+    status           VARCHAR(32)   NOT NULL DEFAULT 'warm' CHECK (status IN ('warm', 'cold', 'responded', 'converted', 'opted_out')),
+    language         VARCHAR(8)    NOT NULL DEFAULT 'de' CHECK (language IN ('de', 'en', 'bs', 'sr', 'hr', 'other')),
+    followup_count   SMALLINT      NOT NULL DEFAULT 0 CHECK (followup_count BETWEEN 0 AND 3),
+    first_contact_at TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    last_followup_at TIMESTAMPTZ,
+    next_followup_at TIMESTAMPTZ,
+    responded_at     TIMESTAMPTZ,
+    context          JSONB         NOT NULL DEFAULT '{}',
+    created_at       TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT leads_psid_platform_unique UNIQUE (psid, platform)
+);
+
+CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
+CREATE INDEX IF NOT EXISTS idx_leads_next_followup ON leads(next_followup_at) WHERE status = 'warm';
+CREATE INDEX IF NOT EXISTS idx_leads_psid ON leads(psid);
+CREATE INDEX IF NOT EXISTS idx_leads_platform ON leads(platform);
+
+CREATE TRIGGER update_leads_updated_at
+    BEFORE UPDATE ON leads
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- =============================================================================
+-- lead_followups — Log aller gesendeten Follow-up-Nachrichten
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS lead_followups (
+    id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    lead_id          UUID          NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+    step             SMALLINT      NOT NULL CHECK (step BETWEEN 1 AND 3),
+    message_content  TEXT          NOT NULL,
+    sent_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    delivered        BOOLEAN       NOT NULL DEFAULT FALSE,
+    reviewer_approved BOOLEAN      NOT NULL DEFAULT TRUE,
+    error            TEXT,
+    created_at       TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lead_followups_lead_id ON lead_followups(lead_id);
+CREATE INDEX IF NOT EXISTS idx_lead_followups_sent_at ON lead_followups(sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_lead_followups_delivered ON lead_followups(delivered) WHERE delivered = FALSE;
+
+-- =============================================================================
 -- Kommentare / Abschluss
 -- =============================================================================
 COMMENT ON TABLE messages IS 'Alle ein- und ausgehenden Nachrichten über alle Plattformen';
@@ -198,3 +248,5 @@ COMMENT ON TABLE escalations IS 'Eskalationen an menschliche Mitarbeiter mit DSG
 COMMENT ON TABLE consent IS 'DSGVO-Einwilligungen und Opt-out-Verwaltung pro Nutzer';
 COMMENT ON TABLE campaign_learnings IS 'Performance-Learnings für datengetriebene Content-Optimierung';
 COMMENT ON TABLE scheduled_posts IS 'Geplante und veröffentlichte Social-Media-Posts via Postiz';
+COMMENT ON TABLE leads IS 'Warme Leads mit Follow-up-Timing für automatisches Nurturing';
+COMMENT ON TABLE lead_followups IS 'Log aller gesendeten Follow-up-Nachrichten pro Lead';

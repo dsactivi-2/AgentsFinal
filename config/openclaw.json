@@ -61,6 +61,27 @@
       "agentId": "main",
       "message": "ROLE:reflexion — Wöchentliche Selbstreflexion: Analysiere letzte 7 Tage Outputs aller 9 Rollen (planner, writer, reviewer, publisher, analytics, optimizer, inbox, memory-critic, escalation). Welche performen gut, welche schlecht? Speichere skill_improvement Einträge pro Rolle + reflexion_report mit max 5 Bullet Points. Keine Skill-Dateien überschreiben — nur Vorschläge in Supermemory.",
       "timezone": "Europe/Berlin"
+    },
+    {
+      "id": "lead-nurturing-morning",
+      "schedule": "0 9 * * *",
+      "agentId": "main",
+      "message": "ROLE:lead_nurturing — Morgen-Run: Prüfe fällige Follow-ups (next_followup_at <= NOW(), status=warm, opted_out=FALSE). Erstelle Nachrichten via ROLE:writer, prüfe via ROLE:reviewer, sende via meta-bridge. Max 50 Leads pro Run.",
+      "timezone": "Europe/Berlin"
+    },
+    {
+      "id": "lead-nurturing-midday",
+      "schedule": "0 13 * * *",
+      "agentId": "main",
+      "message": "ROLE:lead_nurturing — Mittag-Run: Prüfe fällige Follow-ups (next_followup_at <= NOW(), status=warm, opted_out=FALSE). Erstelle Nachrichten via ROLE:writer, prüfe via ROLE:reviewer, sende via meta-bridge. Max 50 Leads pro Run.",
+      "timezone": "Europe/Berlin"
+    },
+    {
+      "id": "lead-nurturing-evening",
+      "schedule": "0 17 * * *",
+      "agentId": "main",
+      "message": "ROLE:lead_nurturing — Abend-Run: Prüfe fällige Follow-ups (next_followup_at <= NOW(), status=warm, opted_out=FALSE). Erstelle Nachrichten via ROLE:writer, prüfe via ROLE:reviewer, sende via meta-bridge. Max 50 Leads pro Run.",
+      "timezone": "Europe/Berlin"
     }
   ],
 
