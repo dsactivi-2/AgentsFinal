@@ -1,11 +1,66 @@
+# Secrets & Credentials
 .env
+.env.*
 *.env
+!.env.example
 !*.env.example
+
+# Python
+services/*/venv/
+services/*/__pycache__/
+services/*/*.pyc
 __pycache__/
 *.pyc
 *.pyo
-.DS_Store
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Logs
+logs/
 *.log
+*.log.*
+services/*/logs/
+
+# PID files
+*.pid
+
+# Node
 node_modules/
+.npm
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python venvs
 .venv/
 venv/
+
+# Docker volumes (local data)
+volumes/
+data/postgres/
+data/redis/
+
+# Database dumps
+*.sql.gz
+*.dump
+
+# OpenClaw local state
+.openclaw/workspace-state.json
+
+# Test artifacts
+.pytest_cache/
+coverage/
+htmlcov/
+.coverage
