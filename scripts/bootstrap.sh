@@ -176,48 +176,64 @@ setup_openclaw() {
     fi
 
     local oc_dir="${HOME}/.openclaw"
-    mkdir -p "${oc_dir}"
+    local workspace="${oc_dir}/workspace-social-ai"
+    mkdir -p "${oc_dir}" "${workspace}"
 
+    # openclaw.json: Symlink (damit Änderungen im Repo sofort wirksam sind)
     if [[ ! -f "${oc_dir}/openclaw.json" ]]; then
         ln -sf "${REPO_DIR}/config/openclaw.json" "${oc_dir}/openclaw.json"
         success "openclaw.json verlinkt"
     else
-        info "openclaw.json vorhanden — Update erzwingen? Manuell: cp config/openclaw.json ~/.openclaw/openclaw.json"
+        # Force-Update: neuere Version aus Repo gewinnt
+        ln -sf "${REPO_DIR}/config/openclaw.json" "${oc_dir}/openclaw.json"
+        success "openclaw.json aktualisiert"
     fi
 
-    # Workspace-Verzeichnis einrichten
-    local workspace="${oc_dir}/workspace"
-    mkdir -p "${workspace}"
-
-    # OpenClaw Workspace-Dateien kopieren/verlinken
-    for ws_file in SOUL.md AGENTS.md MEMORY.md HEARTBEAT.md; do
-        local src="${REPO_DIR}/config/${ws_file}"
-        local dst="${workspace}/${ws_file}"
+    # Workspace-Root-Dateien aus workspace/ kopieren (IDENTITY, MEMORY)
+    for ws_file in IDENTITY.md; do
+        local src="${REPO_DIR}/workspace/${ws_file}"
         if [[ -f "${src}" ]]; then
-            ln -sf "${src}" "${dst}"
+            ln -sf "${src}" "${workspace}/${ws_file}"
             success "Workspace: ${ws_file} verlinkt"
         fi
     done
 
-    # Skills-Verzeichnis verlinken (per-agent skills/ folder — wird von OpenClaw automatisch geladen)
-    local skills_src="${REPO_DIR}/config/skills"
+    # Config-Dateien aus config/ in Workspace-Root verlinken
+    for cfg_file in SOUL.md AGENTS.md MEMORY.md HEARTBEAT.md; do
+        local src="${REPO_DIR}/config/${cfg_file}"
+        if [[ -f "${src}" ]]; then
+            ln -sf "${src}" "${workspace}/${cfg_file}"
+            success "Workspace: ${cfg_file} verlinkt"
+        fi
+    done
+
+    # Skills: workspace/skills/{name}/ → workspace-social-ai/skills/{name}/
+    local skills_src="${REPO_DIR}/workspace/skills"
     local skills_dst="${workspace}/skills"
+    mkdir -p "${skills_dst}"
+
     if [[ -d "${skills_src}" ]]; then
-        mkdir -p "${skills_dst}"
-        for skill_file in "${skills_src}"/*.md; do
-            [[ -f "${skill_file}" ]] || continue
+        local skill_count=0
+        for skill_dir in "${skills_src}"/*/; do
+            [[ -d "${skill_dir}" ]] || continue
             local skill_name
-            skill_name="$(basename "${skill_file}")"
-            ln -sf "${skill_file}" "${skills_dst}/${skill_name}"
+            skill_name="$(basename "${skill_dir}")"
+            local dst_dir="${skills_dst}/${skill_name}"
+            mkdir -p "${dst_dir}"
+            # SKILL.md + _meta.json einzeln verlinken
+            for skill_file in SKILL.md _meta.json; do
+                if [[ -f "${skill_dir}${skill_file}" ]]; then
+                    ln -sf "${skill_dir}${skill_file}" "${dst_dir}/${skill_file}"
+                fi
+            done
+            skill_count=$((skill_count + 1))
         done
-        local skill_count
-        skill_count=$(ls "${skills_src}"/*.md 2>/dev/null | wc -l | tr -d ' ')
         success "Workspace: skills/ verlinkt (${skill_count} Skills)"
     else
-        warn "config/skills/ nicht gefunden — Skills werden nicht geladen"
+        warn "workspace/skills/ nicht gefunden — Skills werden nicht geladen"
     fi
 
-    success "OpenClaw Workspace eingerichtet (${workspace})"
+    success "OpenClaw Workspace eingerichtet: ${workspace}"
 }
 
 create_start_scripts() {
@@ -227,33 +243,51 @@ create_start_scripts() {
 #!/usr/bin/env bash
 set -euo pipefail
 SVC_DIR="$(cd "$(dirname "$0")/../services/mem0-api" && pwd)"
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PID_FILE="/tmp/mem0-api.pid"
+LOG_FILE="${REPO_DIR}/logs/mem0-api.log"
+mkdir -p "${REPO_DIR}/logs"
 cd "$SVC_DIR"
 [[ -f .env ]] && set -o allexport && source .env && set +o allexport
 source venv/bin/activate
-exec uvicorn app:app --host 127.0.0.1 --port 8010 --workers 1 --log-level info
+uvicorn app:app --host 127.0.0.1 --port 8010 --workers 1 --log-level info >> "${LOG_FILE}" 2>&1 &
+echo $! > "${PID_FILE}"
+echo "[mem0-api] gestartet — PID $(cat ${PID_FILE}) — Port 8010"
 SCRIPT
 
     cat > "${REPO_DIR}/scripts/start-meta-bridge.sh" << 'SCRIPT'
 #!/usr/bin/env bash
 set -euo pipefail
 SVC_DIR="$(cd "$(dirname "$0")/../services/meta-bridge" && pwd)"
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PID_FILE="/tmp/meta-bridge.pid"
+LOG_FILE="${REPO_DIR}/logs/meta-bridge.log"
+mkdir -p "${REPO_DIR}/logs"
 cd "$SVC_DIR"
 [[ -f .env ]] && set -o allexport && source .env && set +o allexport
 source venv/bin/activate
-exec uvicorn app:app --host 127.0.0.1 --port 8085 --workers 1 --log-level info
+uvicorn app:app --host 127.0.0.1 --port 8085 --workers 1 --log-level info >> "${LOG_FILE}" 2>&1 &
+echo $! > "${PID_FILE}"
+echo "[meta-bridge] gestartet — PID $(cat ${PID_FILE}) — Port 8085"
 SCRIPT
 
     cat > "${REPO_DIR}/scripts/start-openclaw.sh" << 'SCRIPT'
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")/.."
-exec openclaw start --config config/openclaw.json
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PID_FILE="/tmp/openclaw.pid"
+LOG_FILE="${REPO_DIR}/logs/openclaw.log"
+mkdir -p "${REPO_DIR}/logs"
+cd "${REPO_DIR}"
+openclaw start --config config/openclaw.json >> "${LOG_FILE}" 2>&1 &
+echo $! > "${PID_FILE}"
+echo "[openclaw] gestartet — PID $(cat ${PID_FILE})"
 SCRIPT
 
     chmod +x "${REPO_DIR}/scripts/start-mem0-api.sh" \
              "${REPO_DIR}/scripts/start-meta-bridge.sh" \
              "${REPO_DIR}/scripts/start-openclaw.sh"
-    success "Start-Scripts erstellt"
+    success "Start-Scripts erstellt (mit PID-Files)"
 }
 
 syntax_checks() {
@@ -289,20 +323,30 @@ print_summary() {
     echo "   nano services/meta-bridge/.env"
     echo "   nano services/mem0-api/.env"
     echo ""
-    echo "2. Services starten (3 Terminals):"
-    echo "   ./scripts/start-mem0-api.sh     # Port 8010"
-    echo "   ./scripts/start-meta-bridge.sh  # Port 8085"
-    echo "   ./scripts/start-openclaw.sh     # OpenClaw Agent"
+    echo "2. Services starten:"
+    echo "   ./scripts/start-mem0-api.sh     # Port 8010 — PID: /tmp/mem0-api.pid"
+    echo "   ./scripts/start-meta-bridge.sh  # Port 8085 — PID: /tmp/meta-bridge.pid"
+    echo "   ./scripts/start-openclaw.sh     # OpenClaw Agent — PID: /tmp/openclaw.pid"
     echo ""
-    echo "3. Healthcheck:"
+    echo "   Oder alle auf einmal:"
+    echo "   for s in mem0-api meta-bridge openclaw; do ./scripts/start-\${s}.sh; done"
+    echo ""
+    echo "3. Workspace:"
+    echo "   ~/.openclaw/workspace-social-ai/   ← 11 Skills verlinkt"
+    echo "   ~/.openclaw/openclaw.json           ← Symlink auf config/openclaw.json"
+    echo ""
+    echo "4. Healthcheck:"
     echo "   ./scripts/healthcheck.sh"
     echo ""
-    echo "4. Meta Webhook:"
+    echo "5. Meta Webhook:"
     echo "   Callback URL: https://[deine-domain]/webhook"
-    echo "   Verify Token: [META_VERIFY_TOKEN]"
+    echo "   Verify Token: \$META_VERIFY_TOKEN"
     echo ""
-    echo "5. Logs:"
+    echo "6. Logs:"
     echo "   tail -f logs/bootstrap.log"
+    echo "   tail -f logs/mem0-api.log"
+    echo "   tail -f logs/meta-bridge.log"
+    echo "   tail -f logs/openclaw.log"
     echo ""
 }
 
