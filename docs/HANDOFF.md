@@ -1,4 +1,4 @@
-# HANDOFF — AgentsFinal / Session 2026-03-17
+# HANDOFF — AgentsFinal / Session 2026-03-18
 
 ## Aktueller Stand (LIVE)
 
@@ -25,8 +25,17 @@
 ### OpenClaw Gateway
 | Was | Status |
 |---|---|
-| Gateway läuft auf Tailscale-IP `100.88.196.1:18789` | ✅ |
-| Caddy proxyt `https://marki.ds.activi.io` → Gateway | ✅ |
+| Gateway bind: `loopback` (127.0.0.1:18789) | ✅ |
+| Gateway mode: `local`, reload: `hybrid` | ✅ |
+| `trustedProxies: ["127.0.0.1"]` | ✅ |
+| `allowedOrigins`: nur 2 HTTPS-Domains | ✅ |
+| Pairing: 2 Geräte genehmigt | ✅ |
+| Caddy proxyt `https://marki.ds.activi.io` → `127.0.0.1:18789` | ✅ |
+| Caddy proxyt `https://marki.tail47b17c.ts.net` → `127.0.0.1:18789` | ✅ |
+| Caddy v2.11.2 (von 2.6.2 upgegraded) | ✅ |
+| Caddy: `flush_interval -1`, `stream_timeout 24h`, `stream_close_delay 5m` | ✅ |
+| Tailscale-Cert auto-renewal: systemd timer (Tag 10+20/Monat, 03:00 UTC) | ✅ |
+| Systemd Linger root: `Linger=yes` | ✅ |
 | Primär-Modell: `ollama/glm-5:cloud` | ✅ |
 | Fallback 1: `ollama/minimax-m2.5:cloud` | ✅ |
 | Fallback 2: `ollama/kimi-k2.5:cloud` | ✅ |
@@ -129,23 +138,27 @@ git push origin main
 Internet
   │
   ▼
-marki.ds.activi.io:443 (Caddy + SSL)
+marki.ds.activi.io:443  (Caddy v2.11.2, Let's Encrypt)
+marki.tail47b17c.ts.net:443  (Caddy, Tailscale-Cert, auto-renewal Tag 10+20)
   │
-  ├─► :18789 OpenClaw Gateway (Tailscale)
-  │     └─► Agent "Ava" (glm-5:cloud)
-  │           └─► ~/.openclaw/workspace-social-ai/ (11 Skills)
+  ▼ reverse_proxy (flush_interval -1, stream_timeout 24h, stream_close_delay 5m)
   │
-  └─► /hooks/meta → :8085 meta-bridge
+  ▼
+127.0.0.1:18789 — OpenClaw Gateway (loopback, hybrid-reload, trustedProxies)
+  │
+  ├─► Agent "Ava" (glm-5:cloud, Fallback: minimax → kimi → qwen)
+  │     └─► ~/.openclaw/workspace-social-ai/ (11 Skills)
+  │
+  └─► /hooks/meta → :8085 meta-bridge  ⚠️ NOCH NICHT GESTARTET
         └─► Facebook/Instagram Webhook
-              └─► OpenClaw Hook → Agent
 
 Datenbank-Layer (localhost only):
   - Redis :6379 — Session-State
-  - PostgreSQL :5432 — Logs, Leads, Audit
+  - PostgreSQL :5432 — Logs, Leads, Audit (inkl. error_logs)
 
 Memory:
   - memory-core (Workspace Markdown-Files)
-  - Supermemory (wenn API Key gesetzt)
+  - Supermemory (wenn API Key gesetzt)  ⚠️ KEY FEHLT NOCH
 ```
 
 ---

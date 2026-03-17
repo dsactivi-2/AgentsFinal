@@ -298,17 +298,68 @@ Nach Änderungen an Postiz oder an Agenten-Integrationen:
 
 Nach Änderung:
 
-1. Syntax prüfen
-2. Caddy reload
-3. HTTPS und Routing testen
+1. Syntax prüfen: `caddy validate --config /etc/caddy/Caddyfile`
+2. Caddy reload: `systemctl reload caddy`
+3. HTTPS und Routing testen: `curl -sI https://marki.ds.activi.io/`
+
+### Aktuelles Caddy-Setup (v2.11.2)
+
+```
+marki.ds.activi.io {
+    reverse_proxy 127.0.0.1:18789 {
+        flush_interval -1        # Low-Latency, kein Response-Buffering (WebSocket)
+        stream_timeout 24h       # Zombie-WebSocket-Verbindungen automatisch beenden
+        stream_close_delay 5m    # Graceful reload: aktive WS 5 min weiterlaufen lassen
+    }
+}
+
+marki.tail47b17c.ts.net {
+    tls /etc/caddy/marki.tail47b17c.ts.net.crt /etc/caddy/marki.tail47b17c.ts.net.key
+    reverse_proxy 127.0.0.1:18789 {
+        flush_interval -1
+        stream_timeout 24h
+        stream_close_delay 5m
+    }
+}
+```
+
+### Tailscale-Cert Auto-Renewal
+
+Cert läuft nach 90 Tagen ab. Automatische Erneuerung via systemd-Timer:
+- Läuft am 10. und 20. jeden Monats um 03:00 UTC
+- Service: `/etc/systemd/system/tailscale-cert-renew.service`
+- Script: `/usr/local/bin/tailscale-cert-renew.sh`
+- Status: `systemctl list-timers tailscale-cert-renew.timer`
+- Manuell: `systemctl start tailscale-cert-renew.service`
 
 ## OpenClaw-Konfiguration
 
 Nach Änderung:
 
-1. Dienst neu starten
-2. Gateway-/Hook-Erreichbarkeit testen
+1. Dienst neu starten: `systemctl --user restart openclaw-gateway`
+2. Gateway-/Hook-Erreichbarkeit testen: `curl -sI https://marki.ds.activi.io/`
 3. Testworkflow laufen lassen
+
+### Aktuelles Gateway-Setup
+
+Config: `~/.openclaw/openclaw.json` (live, Secrets darin — NICHT ins Repo committen)
+Referenz ohne Secrets: `config/openclaw.json` im Repo
+
+Optimale Einstellungen (verifiziert 2026-03-18):
+- `gateway.bind`: `loopback` — nur Caddy kann direkt zugreifen
+- `gateway.mode`: `local`
+- `gateway.reload.mode`: `hybrid` — hot-reload wenn sicher, sonst Neustart
+- `gateway.trustedProxies`: `["127.0.0.1"]` — Caddy als Proxy vertrauen
+- `gateway.auth.mode`: `token` — fester Token, kein Wechsel bei Neustart
+- `gateway.controlUi.allowedOrigins`: nur explizite HTTPS-Domains
+
+### Gateway Pairing
+
+Neue Geräte (Browser) müssen genehmigt werden:
+```bash
+openclaw devices list       # ausstehende Requests anzeigen
+openclaw devices approve <REQUEST_ID>
+```
 
 ## mem0-Konfiguration
 

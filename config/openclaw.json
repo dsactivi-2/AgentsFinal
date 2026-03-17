@@ -2,12 +2,8 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "ollama/glm-5:cloud",
-        "fallbacks": [
-          "ollama/minimax-m2.5:cloud",
-          "ollama/kimi-k2.5:cloud",
-          "ollama/leckminartor/qwen3.5-uncensored:397b-cloud"
-        ]
+        "primary": "anthropic/claude-sonnet-4-6",
+        "fallbacks": []
       },
       "workspace": "~/.openclaw/workspace-social-ai",
       "timeoutSeconds": 1800,
@@ -48,11 +44,21 @@
     "level": "info"
   },
   "gateway": {
+    "mode": "local",
+    "bind": "loopback",
+    "trustedProxies": ["127.0.0.1"],
+    "reload": {
+      "mode": "hybrid"
+    },
     "controlUi": {
       "allowedOrigins": [
-        "https://marki.ds.activi.io",
-        "https://marki.tail47b17c.ts.net"
+        "https://YOUR_DOMAIN",
+        "https://YOUR_TAILSCALE_DOMAIN.ts.net"
       ]
+    },
+    "auth": {
+      "mode": "token",
+      "token": "REPLACE_WITH_STRONG_TOKEN"
     }
   }
 }
