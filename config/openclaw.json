@@ -1,0 +1,78 @@
+{
+  "agent": {
+    "model": "ollama-cloud/${OLLAMA_CLOUD_MODEL}",
+    "workspace": "~/.openclaw/workspace",
+    "timeoutSeconds": 1800,
+    "heartbeat": {
+      "every": "60m"
+    },
+    "fallback": {
+      "model": "anthropic/claude-sonnet-4-6"
+    }
+  },
+
+  "providers": {
+    "ollama-cloud": {
+      "apiBase": "${OLLAMA_CLOUD_API_BASE}",
+      "apiKey": "${OLLAMA_CLOUD_API_KEY}"
+    },
+    "anthropic": {
+      "apiKey": "${ANTHROPIC_API_KEY}"
+    }
+  },
+
+  "hooks": {
+    "mappings": [
+      {
+        "match": { "path": "meta" },
+        "action": "agent",
+        "agentId": "main",
+        "deliver": true,
+        "timeout": 45
+      }
+    ]
+  },
+
+  "cron": [
+    {
+      "id": "planner-daily",
+      "schedule": "0 9 * * *",
+      "agentId": "main",
+      "message": "ROLE:planner — Täglicher Planungs-Zyklus: Erstelle Content-Plan für die nächsten 7 Tage. Analysiere aktuelle Kampagnen, Performance-Daten und Lead-Ziele. Berücksichtige organischen Content (Posts, Stories, Reels) UND Paid-Ad-Ideen.",
+      "timezone": "Europe/Berlin"
+    },
+    {
+      "id": "analytics-daily",
+      "schedule": "0 20 * * *",
+      "agentId": "main",
+      "message": "ROLE:analytics — Tägliche Performance-Analyse: Werte Posts, Reach, Engagement und Lead-Conversions aus. Leite Optimierungsempfehlungen für morgen ab.",
+      "timezone": "Europe/Berlin"
+    },
+    {
+      "id": "memory-cleanup-weekly",
+      "schedule": "0 3 * * 0",
+      "agentId": "main",
+      "message": "ROLE:memory_critic — Wöchentliche Memory-Hygiene: Prüfe veraltete Einträge, dedupliziere Kampagnen-Learnings, verdichte wichtige Erkenntnisse.",
+      "timezone": "Europe/Berlin"
+    }
+  ],
+
+  "session": {
+    "scope": "per-sender",
+    "resetTriggers": ["/new", "/reset"],
+    "reset": {
+      "mode": "idleMinutes",
+      "idleMinutes": 1440
+    }
+  },
+
+  "plugins": {
+    "slots": {
+      "memory": "memory-core"
+    }
+  },
+
+  "logging": {
+    "level": "info"
+  }
+}

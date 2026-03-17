@@ -1,0 +1,502 @@
+"""
+Meta Bridge v2 — Bidirektionale Meta Webhook Bridge für Facebook/Instagram/Messenger.
+
+Neu in v2:
+  - Redis: Persistente Deduplizierung (SETNX + TTL) + graceful fallback auf In-Memory
+  - Postgres: Nachrichten-Logging (messages-Tabelle) + graceful fallback
+  - Beide Backends sind optional; Bridge läuft auch ohne sie.
+
+Endpunkte:
+  GET  /webhook  → Meta Webhook-Verifikation
+  POST /webhook  → Eingehende Meta Events
+  POST /reply    → Interner Endpunkt für OpenClaw-Antworten
+  GET  /health   → Status aller Backends
+"""
+
+import hashlib
+import hmac
+import json
+import logging
+import os
+import time
+import uuid
+from contextlib import asynccontextmanager
+from typing import Any
+
+import httpx
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi.responses import PlainTextResponse
+
+# ─── Optionale Backends (graceful degradation) ───────────────────────────────
+
+try:
+    import redis.asyncio as aioredis  # type: ignore
+    _HAS_REDIS = True
+except ImportError:
+    _HAS_REDIS = False
+
+try:
+    import asyncpg  # type: ignore
+    _HAS_ASYNCPG = True
+except ImportError:
+    _HAS_ASYNCPG = False
+
+# ─── Logging ────────────────────────────────────────────────────────────────
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='{"time":"%(asctime)s","level":"%(levelname)s","msg":%(message)s}',
+)
+logger = logging.getLogger("meta-bridge")
+
+
+def log(msg: str, **kwargs: Any) -> None:
+    extra = json.dumps(kwargs) if kwargs else "{}"
+    logger.info(f'"{msg}", "extra":{extra}')
+
+
+def log_error(msg: str, **kwargs: Any) -> None:
+    extra = json.dumps(kwargs) if kwargs else "{}"
+    logger.error(f'"{msg}", "extra":{extra}')
+
+
+# ─── Konfiguration ───────────────────────────────────────────────────────────
+
+VERIFY_TOKEN: str = os.environ["META_VERIFY_TOKEN"]
+APP_SECRET: str = os.environ["META_APP_SECRET"]
+PAGE_ACCESS_TOKEN: str = os.environ["META_PAGE_ACCESS_TOKEN"]
+OPENCLAW_HOOK_URL: str = os.getenv(
+    "OPENCLAW_HOOK_URL", "http://127.0.0.1:18789/hooks/meta"
+)
+META_GRAPH_URL: str = "https://graph.facebook.com/v19.0/me/messages"
+OPENCLAW_TIMEOUT: float = float(os.getenv("OPENCLAW_TIMEOUT", "45"))
+META_API_TIMEOUT: float = float(os.getenv("META_API_TIMEOUT", "10"))
+
+REDIS_URL: str = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+
+DB_HOST: str = os.getenv("DB_HOST", "127.0.0.1")
+DB_PORT: int = int(os.getenv("DB_PORT", "5432"))
+DB_NAME: str = os.getenv("DB_NAME", "social_ai")
+DB_USER: str = os.getenv("DB_USER", "postgres")
+DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
+
+DEDUP_TTL: int = 300  # 5 Minuten in Sekunden
+
+# ─── Runtime State ───────────────────────────────────────────────────────────
+
+_seen_ids: dict[str, float] = {}  # In-Memory Fallback-Dedup
+redis_client: Any = None
+db_pool: Any = None
+
+
+# ─── Lifespan (Startup / Shutdown) ──────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global redis_client, db_pool
+
+    # Redis
+    if _HAS_REDIS:
+        try:
+            redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
+            await redis_client.ping()
+            log("redis_connected")
+        except Exception as exc:
+            log_error("redis_unavailable", error=str(exc))
+            redis_client = None
+    else:
+        log("redis_not_installed", hint="pip install redis[asyncio]")
+
+    # Postgres
+    if _HAS_ASYNCPG:
+        try:
+            db_pool = await asyncpg.create_pool(
+                host=DB_HOST,
+                port=DB_PORT,
+                database=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD or None,
+                min_size=1,
+                max_size=5,
+                command_timeout=10,
+            )
+            log("postgres_connected", host=DB_HOST, db=DB_NAME)
+        except Exception as exc:
+            log_error("postgres_unavailable", error=str(exc))
+            db_pool = None
+    else:
+        log("asyncpg_not_installed", hint="pip install asyncpg")
+
+    yield  # App läuft
+
+    if redis_client:
+        await redis_client.aclose()
+    if db_pool:
+        await db_pool.close()
+
+
+# ─── Deduplizierung ──────────────────────────────────────────────────────────
+
+async def _is_duplicate(message_id: str) -> bool:
+    """
+    Prüft ob message_id bereits verarbeitet wurde.
+    Primär: Redis SETNX + TTL (persistent, überlebt Restarts).
+    Fallback: In-Memory TTL-Dict (geht bei Restart verloren).
+    """
+    if redis_client:
+        try:
+            result = await redis_client.set(
+                f"meta:dedup:{message_id}",
+                "1",
+                nx=True,    # Only set if Not eXists
+                ex=DEDUP_TTL,
+            )
+            # result=True → Key neu gesetzt (nicht Duplikat)
+            # result=None → Key existierte bereits (Duplikat)
+            return result is None
+        except Exception as exc:
+            log_error("redis_dedup_error", error=str(exc))
+            # Fall through zu In-Memory
+
+    # In-Memory Fallback
+    now = time.monotonic()
+    expired = [k for k, t in _seen_ids.items() if now - t > DEDUP_TTL]
+    for k in expired:
+        del _seen_ids[k]
+    if message_id in _seen_ids:
+        return True
+    _seen_ids[message_id] = now
+    return False
+
+
+# ─── Postgres Logging ────────────────────────────────────────────────────────
+
+async def _log_message(
+    psid: str,
+    platform: str,
+    direction: str,
+    content: str,
+    meta_message_id: str | None = None,
+    request_id: str | None = None,
+) -> None:
+    """
+    Schreibt Nachricht in messages-Tabelle (aus schema.sql).
+    Fehler stoppen nicht die Bridge (nur geloggt).
+    """
+    if not db_pool:
+        return
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO messages
+                    (platform, psid, direction, content,
+                     meta_message_id, request_id, processed)
+                VALUES ($1, $2, $3, $4, $5, $6, true)
+                """,
+                platform,
+                psid,
+                direction,
+                content[:10_000],
+                meta_message_id,
+                request_id,
+            )
+    except Exception as exc:
+        log_error("db_log_failed", direction=direction, error=str(exc))
+
+
+# ─── Signatur-Verifikation ───────────────────────────────────────────────────
+
+def _verify_signature(body: bytes, signature_header: str | None) -> bool:
+    """Verifiziert X-Hub-Signature-256 gegen APP_SECRET (constant-time compare)."""
+    if not signature_header or not signature_header.startswith("sha256="):
+        return False
+    expected = "sha256=" + hmac.new(
+        APP_SECRET.encode("utf-8"), body, hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature_header)
+
+
+# ─── Meta Graph API ───────────────────────────────────────────────────────────
+
+async def send_meta_message(
+    recipient_psid: str,
+    text: str,
+    platform: str = "messenger",
+    request_id: str | None = None,
+) -> bool:
+    """Sendet Textnachricht via Meta Graph API und loggt ausgehende Nachricht in Postgres."""
+    payload = {
+        "recipient": {"id": recipient_psid},
+        "message": {"text": text[:2000]},  # Meta-Limit: 2000 Zeichen
+        "messaging_type": "RESPONSE",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=META_API_TIMEOUT) as client:
+            resp = await client.post(
+                META_GRAPH_URL,
+                params={"access_token": PAGE_ACCESS_TOKEN},
+                json=payload,
+            )
+        if resp.status_code == 200:
+            log("meta_send_ok", psid=recipient_psid[:8] + "***")
+            await _log_message(
+                recipient_psid, platform, "out", text, request_id=request_id
+            )
+            return True
+        log_error(
+            "meta_send_failed",
+            status=resp.status_code,
+            body=resp.text[:200],
+            psid=recipient_psid[:8] + "***",
+        )
+        return False
+    except Exception as exc:
+        log_error("meta_send_exception", error=str(exc))
+        return False
+
+
+# ─── Payload-Normalisierung ──────────────────────────────────────────────────
+
+def _extract_events(payload: dict) -> list[dict]:
+    """
+    Extrahiert normalisierte Events aus dem Meta Webhook-Payload.
+    Unterstützt Messenger (messaging[]) und Instagram (changes[]).
+    """
+    events: list[dict] = []
+    obj_type = payload.get("object", "")
+
+    for entry in payload.get("entry", []):
+        # ── Messenger / Facebook ──────────────────────────────────────────
+        for msg_event in entry.get("messaging", []):
+            sender = msg_event.get("sender", {}).get("id", "")
+            message = msg_event.get("message", {})
+            msg_id = message.get("mid", "")
+            text = message.get("text", "")
+            attachments = message.get("attachments", [])
+
+            if not sender or not msg_id:
+                continue
+            if message.get("is_echo"):  # Eigene gesendete Nachrichten ignorieren
+                continue
+
+            events.append({
+                "psid": sender,
+                "message_id": msg_id,
+                "text": text,
+                "attachments": attachments,
+                "platform": "messenger",
+                "object": obj_type,
+            })
+
+        # ── Instagram ─────────────────────────────────────────────────────
+        for change in entry.get("changes", []):
+            value = change.get("value", {})
+            if change.get("field") != "messages":
+                continue
+
+            sender = value.get("sender", {}).get("id", "")
+            msg = value.get("message", {})
+            msg_id = msg.get("mid", "")
+            text = msg.get("text", "")
+
+            if not sender or not msg_id:
+                continue
+
+            events.append({
+                "psid": sender,
+                "message_id": msg_id,
+                "text": text,
+                "attachments": [],
+                "platform": "instagram",
+                "object": obj_type,
+            })
+
+    return events
+
+
+# ─── OpenClaw-Integration ────────────────────────────────────────────────────
+
+async def _process_event(event: dict, request_id: str) -> None:
+    """
+    Verarbeitet ein normalisiertes Event:
+    1. Loggt eingehende Nachricht in Postgres
+    2. Sendet Event an OpenClaw Hook
+    3. Parst Antwort
+    4. Sendet Antwort via Meta Graph API (wird auch in Postgres geloggt)
+    """
+    psid = event["psid"]
+    platform = event["platform"]
+    t0 = time.monotonic()
+
+    log(
+        "processing_event",
+        request_id=request_id,
+        psid=psid[:8] + "***",
+        platform=platform,
+        has_text=bool(event.get("text")),
+    )
+
+    # Eingehende Nachricht in Postgres loggen
+    await _log_message(
+        psid,
+        platform,
+        "in",
+        event.get("text", "") or "[attachment]",
+        meta_message_id=event.get("message_id"),
+        request_id=request_id,
+    )
+
+    openclaw_payload = {
+        "request_id": request_id,
+        "psid": psid,
+        "platform": platform,
+        "text": event.get("text", ""),
+        "attachments": event.get("attachments", []),
+        "message_id": event["message_id"],
+    }
+
+    reply_text: str | None = None
+
+    try:
+        async with httpx.AsyncClient(timeout=OPENCLAW_TIMEOUT) as client:
+            resp = await client.post(OPENCLAW_HOOK_URL, json=openclaw_payload)
+
+        elapsed = round(time.monotonic() - t0, 2)
+
+        if resp.status_code == 200:
+            try:
+                data = resp.json()
+                reply_text = (
+                    data.get("text")
+                    or data.get("reply")
+                    or data.get("response")
+                    or data.get("content")
+                )
+                if not reply_text and isinstance(data, str):
+                    reply_text = data
+            except Exception:
+                raw = resp.text.strip()
+                if raw:
+                    reply_text = raw
+
+            log(
+                "openclaw_ok",
+                request_id=request_id,
+                elapsed_s=elapsed,
+                has_reply=bool(reply_text),
+            )
+        else:
+            log_error(
+                "openclaw_error",
+                request_id=request_id,
+                status=resp.status_code,
+                body=resp.text[:200],
+                elapsed_s=elapsed,
+            )
+
+    except httpx.TimeoutException:
+        log_error("openclaw_timeout", request_id=request_id, timeout_s=OPENCLAW_TIMEOUT)
+    except Exception as exc:
+        log_error("openclaw_exception", request_id=request_id, error=str(exc))
+
+    if reply_text:
+        await send_meta_message(
+            psid, reply_text, platform=platform, request_id=request_id
+        )
+
+
+# ─── FastAPI App ──────────────────────────────────────────────────────────────
+
+app = FastAPI(title="meta-bridge", version="2.0.0", lifespan=lifespan)
+
+
+@app.get("/health")
+async def health() -> dict:
+    """Dienststatus aller Backends."""
+    return {
+        "ok": True,
+        "service": "meta-bridge",
+        "version": "2.0.0",
+        "redis": redis_client is not None,
+        "postgres": db_pool is not None,
+    }
+
+
+@app.get("/webhook", response_class=PlainTextResponse)
+async def verify_webhook(
+    hub_mode: str = "",
+    hub_verify_token: str = "",
+    hub_challenge: str = "",
+) -> str:
+    """Meta Webhook-Verifikation (Subscribe-Flow)."""
+    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
+        log("webhook_verified")
+        return hub_challenge
+    log_error("webhook_verify_failed", mode=hub_mode)
+    raise HTTPException(status_code=403, detail="Verification failed")
+
+
+@app.post("/webhook", status_code=200)
+async def receive_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+) -> dict:
+    """
+    Empfängt Meta Webhook Events.
+    Antwortet sofort 200 (Meta erwartet < 5s Response).
+    Verarbeitung (OpenClaw + Antwort) läuft als Background Task.
+    """
+    body = await request.body()
+
+    sig = request.headers.get("X-Hub-Signature-256")
+    if not _verify_signature(body, sig):
+        log_error("signature_invalid")
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        log_error("invalid_json")
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    events = _extract_events(payload)
+
+    for event in events:
+        msg_id = event.get("message_id", "")
+        if not msg_id:
+            continue
+        if await _is_duplicate(msg_id):
+            log("duplicate_skipped", message_id=msg_id)
+            continue
+
+        request_id = str(uuid.uuid4())[:8]
+        background_tasks.add_task(_process_event, event, request_id)
+
+    return {"ok": True}
+
+
+@app.post("/reply", status_code=200)
+async def receive_reply(request: Request) -> dict:
+    """
+    Interner Endpunkt: OpenClaw kann hierüber Antworten asynchron zurückschicken.
+    Erwartet: {"psid": "...", "text": "...", "platform": "messenger"}
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    psid = data.get("psid", "").strip()
+    text = data.get("text", "").strip()
+    platform = data.get("platform", "messenger").strip()
+
+    if not psid:
+        raise HTTPException(status_code=422, detail="psid is required")
+    if not text:
+        raise HTTPException(status_code=422, detail="text is required")
+    if platform not in ("messenger", "instagram", "whatsapp", "test"):
+        raise HTTPException(status_code=422, detail=f"Unknown platform: {platform}")
+
+    success = await send_meta_message(psid, text, platform=platform)
+    return {"ok": success}

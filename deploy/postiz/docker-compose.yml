@@ -1,0 +1,39 @@
+services:
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:5000:5000"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      MAIN_URL: ${MAIN_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      BACKEND_INTERNAL_URL: http://postiz:5000
+      JWT_SECRET: ${JWT_SECRET}
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postiz_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - postiz_redis_data:/data
+
+volumes:
+  postiz_postgres_data:
+  postiz_redis_data:

@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenClaw Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agentops
+WorkingDirectory=/opt/agentops
+Environment=HOME=/opt/agentops
+ExecStart=/usr/bin/env bash -lc 'openclaw gateway'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

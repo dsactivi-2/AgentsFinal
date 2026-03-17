@@ -1,0 +1,16 @@
+[Unit]
+Description=mem0 API
+After=network-online.target postgresql.service redis.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agentops
+WorkingDirectory=/opt/agentops/services/mem0-api
+EnvironmentFile=/opt/agentops/secrets/mem0.env
+ExecStart=/opt/agentops/services/mem0-api/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8010
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
