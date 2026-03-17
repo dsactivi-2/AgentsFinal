@@ -1,7 +1,7 @@
 {
   "agent": {
     "model": "ollama-cloud/${OLLAMA_CLOUD_MODEL}",
-    "workspace": "~/.openclaw/workspace",
+    "workspace": "~/.openclaw/workspace-social-ai",
     "timeoutSeconds": 1800,
     "heartbeat": {
       "every": "60m"
