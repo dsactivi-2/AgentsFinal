@@ -2,7 +2,7 @@
 
 ## Was in dieser Session gemacht wurde
 
-Branch: `refactor/openclaw-conform` — 5 Commits auf GitHub
+Branch: `refactor/openclaw-conform` — 7 Commits auf GitHub
 
 | Commit | Was |
 |---|---|
@@ -11,9 +11,14 @@ Branch: `refactor/openclaw-conform` — 5 Commits auf GitHub
 | `e3255f5` | `config/AGENTS.md` → Generic Session Protocol (nicht mehr Rollendefinitionen) |
 | `96b1fb5` | `workspace/IDENTITY.md` erstellt — Ava, 9 Skills, Sprachen, Grenzen |
 | `fa532ce` | README + IDENTITY: Umbenennung auf AgentsFinal / Ava |
+| `48d31ec` | `docs/HANDOFF.md` erstellt |
+| `ed450b3` | `docs/AGENTS.md` Intro-Fix: ein Agent, 9 Verhaltensrollen |
 
 Remote: `git@github.com:dsactivi-2/AgentsFinal.git`
+Lokal: `/Users/dsselmanovic/backups/agents-final.git`
 Branch noch NICHT in `main` gemergt — PR steht aus.
+
+Beide Remotes identisch synchronisiert.
 
 ---
 
@@ -51,10 +56,9 @@ cp config/openclaw.json ~/.openclaw/workspace-social-ai/openclaw.json
 
 ### Priorität 2 — Verbesserungen (kein Blocker)
 
-**D) `docs/AGENTS.md` Intro-Fix**
-- Aktuell steht dort: "Kein einzelner Agent soll alles tun" → konzeptionell falsch
-- Korrekt: Es ist EIN Agent mit 9 Verhaltensrollen
-- Änderung: Intro-Absatz (ca. 5 Zeilen) anpassen
+**D) `docs/AGENTS.md` Intro-Fix** ✅ ERLEDIGT (Session 2026-03-17)
+- Intro wurde angepasst: "Ava ist eine einzelne Instanz die je nach Kontext in eine dieser 9 Rollen wechselt"
+- Falscher Satz "Kein einzelner Agent soll alles tun" entfernt
 
 **E) `workspace/SOUL.md` Symlink / Kopie**
 - Aktuell: SOUL.md liegt in `config/`, OpenClaw erwartet es im Workspace-Root
@@ -109,12 +113,38 @@ Oder via Supermemory API (containerTag: `claude-code-memory`):
 
 ---
 
+## Nächste Agenten — Top 3 Empfehlungen
+
+### 1. Lead Nurturing Agent (höchster Impact, schnell baubar)
+Sendet automatische Follow-ups an warme Leads nach 24h / 3 Tage / 7 Tage.
+- **Nutzt:** meta-bridge (existiert), mem0 (existiert), PostgreSQL (existiert), Postiz (existiert)
+- **Neu nötig:** `workspace/skills/lead-nurturing/SKILL.md` (1 Datei)
+- **Trigger:** Cron 3x täglich → prüft PostgreSQL auf Leads ohne Antwort
+- **Impact:** Automatische Konversions-Optimierung ohne manuellen Aufwand
+
+### 2. Reflexion Agent / ROLE:reflexion (bereits geplant in Plan A1)
+Wöchentliche Selbstanalyse aller 9 Rollen — was lief gut, was schlecht?
+- **Nutzt:** memory_search (existiert), Supermemory (existiert)
+- **Neu nötig:** `workspace/skills/reflexion/SKILL.md` (1 Datei) + Cron So 04:00 in openclaw.json
+- **Darf nicht:** Skill-Dateien selbst überschreiben — nur Vorschläge speichern
+- **Impact:** Langfristige Selbstverbesserung ohne manuelle Analyse
+
+### 3. Content Recycling Agent (Mittel, aber hoher ROI)
+Analysiert Top-Posts der letzten 90 Tage und erstellt neue Varianten davon.
+- **Nutzt:** Postiz Analytics (existiert), writer (existiert), planner (existiert)
+- **Neu nötig:** `workspace/skills/content-recycler/SKILL.md` (1 Datei)
+- **Trigger:** Cron Mo 07:00 → Top 3 Posts der letzten 90 Tage → 3 neue Varianten
+- **Impact:** Bestehendes Erfolgs-Content wird maximal ausgeschöpft
+
+---
+
 ## Offene Entscheidungen (User muss entscheiden)
 
 1. **Agent-Name "Ava"** — behalten oder anderen Namen?
 2. **PR mergen** — wann? refactor/openclaw-conform → main
-3. **`docs/AGENTS.md` Intro** — kleiner Fix, ja/nein?
+3. ~~**`docs/AGENTS.md` Intro`**~~ ✅ erledigt
 4. **ROLE:reflexion (Cron So 04:00)** — noch aus dem ursprünglichen Plan (Teil A1) — wurde noch nicht implementiert
+5. **Welchen Agenten als nächstes bauen?** — Lead Nurturing / Reflexion / Content Recycler?
 
 ---
 
@@ -123,7 +153,7 @@ Oder via Supermemory API (containerTag: `claude-code-memory`):
 ```
 github.com/dsactivi-2/AgentsFinal
 ├── main              ← initial commit (alt)
-└── refactor/openclaw-conform  ← AKTUELL (5 Commits voraus)
+└── refactor/openclaw-conform  ← AKTUELL (7 Commits voraus)
 
 Struktur:
 workspace/
