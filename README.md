@@ -1,4 +1,4 @@
-# social-ai-stack
+# AgentsFinal
 
 Dokumentations- und Scaffold-Repo für einen hybriden Stack aus:
 
