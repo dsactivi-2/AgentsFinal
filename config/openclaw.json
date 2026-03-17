@@ -1,105 +1,45 @@
 {
-  "agent": {
-    "model": "ollama-cloud/${OLLAMA_CLOUD_MODEL}",
-    "workspace": "~/.openclaw/workspace-social-ai",
-    "timeoutSeconds": 1800,
-    "heartbeat": {
-      "every": "60m"
-    },
-    "fallback": {
-      "model": "anthropic/claude-sonnet-4-6"
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "anthropic/claude-sonnet-4-6",
+        "fallbacks": []
+      },
+      "workspace": "~/.openclaw/workspace-social-ai",
+      "timeoutSeconds": 1800,
+      "heartbeat": {
+        "every": "60m"
+      }
     }
   },
-
-  "providers": {
-    "ollama-cloud": {
-      "apiBase": "${OLLAMA_CLOUD_API_BASE}",
-      "apiKey": "${OLLAMA_CLOUD_API_KEY}"
-    },
-    "anthropic": {
-      "apiKey": "${ANTHROPIC_API_KEY}"
-    }
-  },
-
   "hooks": {
     "mappings": [
       {
-        "match": { "path": "meta" },
+        "match": {
+          "path": "meta"
+        },
         "action": "agent",
         "agentId": "main",
-        "deliver": true,
-        "timeout": 45
+        "deliver": true
       }
     ]
   },
-
-  "cron": [
-    {
-      "id": "planner-daily",
-      "schedule": "0 9 * * *",
-      "agentId": "main",
-      "message": "ROLE:planner — Täglicher Planungs-Zyklus: Erstelle Content-Plan für die nächsten 7 Tage. Analysiere aktuelle Kampagnen, Performance-Daten und Lead-Ziele. Berücksichtige organischen Content (Posts, Stories, Reels) UND Paid-Ad-Ideen.",
-      "timezone": "Europe/Berlin"
-    },
-    {
-      "id": "analytics-daily",
-      "schedule": "0 20 * * *",
-      "agentId": "main",
-      "message": "ROLE:analytics — Tägliche Performance-Analyse: Werte Posts, Reach, Engagement und Lead-Conversions aus. Leite Optimierungsempfehlungen für morgen ab.",
-      "timezone": "Europe/Berlin"
-    },
-    {
-      "id": "memory-cleanup-weekly",
-      "schedule": "0 3 * * 0",
-      "agentId": "main",
-      "message": "ROLE:memory_critic — Wöchentliche Memory-Hygiene: Prüfe veraltete Einträge, dedupliziere Kampagnen-Learnings, verdichte wichtige Erkenntnisse.",
-      "timezone": "Europe/Berlin"
-    },
-    {
-      "id": "reflexion-weekly",
-      "schedule": "0 4 * * 0",
-      "agentId": "main",
-      "message": "ROLE:reflexion — Wöchentliche Selbstreflexion: Analysiere letzte 7 Tage Outputs aller 9 Rollen (planner, writer, reviewer, publisher, analytics, optimizer, inbox, memory-critic, escalation). Welche performen gut, welche schlecht? Speichere skill_improvement Einträge pro Rolle + reflexion_report mit max 5 Bullet Points. Keine Skill-Dateien überschreiben — nur Vorschläge in Supermemory.",
-      "timezone": "Europe/Berlin"
-    },
-    {
-      "id": "lead-nurturing-morning",
-      "schedule": "0 9 * * *",
-      "agentId": "main",
-      "message": "ROLE:lead_nurturing — Morgen-Run: Prüfe fällige Follow-ups (next_followup_at <= NOW(), status=warm, opted_out=FALSE). Erstelle Nachrichten via ROLE:writer, prüfe via ROLE:reviewer, sende via meta-bridge. Max 50 Leads pro Run.",
-      "timezone": "Europe/Berlin"
-    },
-    {
-      "id": "lead-nurturing-midday",
-      "schedule": "0 13 * * *",
-      "agentId": "main",
-      "message": "ROLE:lead_nurturing — Mittag-Run: Prüfe fällige Follow-ups (next_followup_at <= NOW(), status=warm, opted_out=FALSE). Erstelle Nachrichten via ROLE:writer, prüfe via ROLE:reviewer, sende via meta-bridge. Max 50 Leads pro Run.",
-      "timezone": "Europe/Berlin"
-    },
-    {
-      "id": "lead-nurturing-evening",
-      "schedule": "0 17 * * *",
-      "agentId": "main",
-      "message": "ROLE:lead_nurturing — Abend-Run: Prüfe fällige Follow-ups (next_followup_at <= NOW(), status=warm, opted_out=FALSE). Erstelle Nachrichten via ROLE:writer, prüfe via ROLE:reviewer, sende via meta-bridge. Max 50 Leads pro Run.",
-      "timezone": "Europe/Berlin"
-    }
-  ],
-
   "session": {
     "scope": "per-sender",
-    "resetTriggers": ["/new", "/reset"],
+    "resetTriggers": [
+      "/new",
+      "/reset"
+    ],
     "reset": {
-      "mode": "idleMinutes",
+      "mode": "idle",
       "idleMinutes": 1440
     }
   },
-
   "plugins": {
     "slots": {
       "memory": "memory-core"
     }
   },
-
   "logging": {
     "level": "info"
   }
