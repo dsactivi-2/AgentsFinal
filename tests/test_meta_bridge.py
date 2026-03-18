@@ -282,6 +282,98 @@ async def test_reply_test_platform(bridge_client):
     assert resp.status_code == 200
 
 
+@pytest.mark.asyncio
+async def test_reply_ok_includes_sent_count(bridge_client):
+    """Response enthält sent-Zähler (1 bei Text-only)."""
+    with respx.mock:
+        respx.post("https://graph.facebook.com/v19.0/me/messages").mock(
+            return_value=httpx.Response(200, json={"message_id": "m_out_1"})
+        )
+        resp = await bridge_client.post(
+            "/reply",
+            json={"psid": "psid_test_123", "text": "Hallo!", "platform": "messenger"},
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["sent"] == 1
+
+
+@pytest.mark.asyncio
+async def test_reply_image_url_only(bridge_client):
+    """image_url ohne text → 200, Bild wird via Meta Graph API gesendet."""
+    with respx.mock:
+        respx.post("https://graph.facebook.com/v19.0/me/messages").mock(
+            return_value=httpx.Response(200, json={"message_id": "m_media_1"})
+        )
+        resp = await bridge_client.post(
+            "/reply",
+            json={
+                "psid": "psid_test_123",
+                "image_url": "https://example.com/bild.jpg",
+                "platform": "messenger",
+            },
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["sent"] == 1
+
+
+@pytest.mark.asyncio
+async def test_reply_text_and_image_url(bridge_client):
+    """text + image_url kombiniert → beide werden gesendet (sent=2)."""
+    with respx.mock:
+        # Beide Calls gehen an dieselbe URL
+        respx.post("https://graph.facebook.com/v19.0/me/messages").mock(
+            return_value=httpx.Response(200, json={"message_id": "m_combo"})
+        )
+        resp = await bridge_client.post(
+            "/reply",
+            json={
+                "psid": "psid_test_123",
+                "text": "Schau dir das an!",
+                "image_url": "https://example.com/bild.jpg",
+                "platform": "messenger",
+            },
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["sent"] == 2
+
+
+@pytest.mark.asyncio
+async def test_reply_no_text_no_image_url(bridge_client):
+    """Weder text noch image_url → 422."""
+    resp = await bridge_client.post(
+        "/reply",
+        json={"psid": "psid_test_123", "platform": "messenger"},
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_reply_image_url_meta_failure(bridge_client):
+    """Meta API schlägt fehl → ok=False, sent=1 (attempt wurde gemacht)."""
+    with respx.mock:
+        respx.post("https://graph.facebook.com/v19.0/me/messages").mock(
+            return_value=httpx.Response(400, json={"error": {"message": "OAuthException"}})
+        )
+        resp = await bridge_client.post(
+            "/reply",
+            json={
+                "psid": "psid_test_123",
+                "image_url": "https://example.com/bild.jpg",
+                "platform": "messenger",
+            },
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is False
+    assert data["sent"] == 1
+
+
 # ─── GET /admin/errors ────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
