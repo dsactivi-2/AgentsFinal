@@ -141,7 +141,7 @@ Nach dem Login:
 - **Direkter Chat mit Ava**
 - Schreibe Befehle wie: `"Was posten wir diese Woche?"`, `"Erstelle einen Plan für Ramadan"`
 - Ava antwortet und führt Aktionen aus
-- Modell: `minimax-m2.5:cloud` (Standard)
+- Modell: `minimax-m2.5` (Standard)
 
 #### Übersicht (Dashboard)
 - Zeigt aktive Sessions, letzte Nachrichten, Systemstatus
@@ -200,7 +200,7 @@ meta-bridge ist der Empfänger für Nachrichten von Facebook/Instagram. Wenn jem
   ```
   /root/social-ai/data/images/YYYYMMDD/uuid.jpg
   ```
-- Ava beschreibt Bilder via Vision-Modell (`qwen3.5:cloud`)
+- Ava beschreibt Bilder via Vision-Modell (`qwen3.5:397b`)
 
 ### Health Check
 

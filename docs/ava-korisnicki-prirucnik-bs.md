@@ -98,40 +98,51 @@ Ava koristi nekoliko različitih AI modela. Svaki je specijaliziran za određene
 
 ## Pregled modela
 
-### 🥇 Primarni model — MiniMax M2.5 Cloud
-```
-Ime modela: ollama/minimax-m2.5:cloud
-```
+### 🥇 Pametno usmjeravanje — Per-Skill modeli
+Ava automatski bira optimalan model za svaki skill:
 
-**Za šta se koristi:**
-- Pisanje svih tekstova (caption, odgovori, planovi)
-- Razgovor s tobom u chatu
-- Analiza poruka od kupaca
-- Kreiranje content planova
-- Sve skille: planner, writer, reviewer, inbox, lead-nurturing
-
-**Zašto ovaj model?**
-MiniMax M2.5 je izuzetno sposoban za višejezičan sadržaj — odlično piše na bosanskom, njemačkom i srpskom jeziku. Razumije kulturni kontekst (Ramadan, Bajram, regionalni praznici).
+| Skill | Model | Prednost |
+|-------|-------|----------|
+| Inbox (odgovori) | `ollama/kimi-k2.5` | Brz, višejezičan |
+| Publisher (objave) | `ollama/gemini-3-flash-preview` | Stabilan za API |
+| Writer (pisanje) | `ollama/minimax-m2.1` | Kreativnost, BS/DE/SR |
+| Lead-Nurturing | `ollama/minimax-m2.1` | Empatična komunikacija |
+| Planner, Reviewer | `ollama/deepseek-v3.2` | Analitičko razmišljanje |
+| Analytics, Optimizer | `ollama/deepseek-v3.2` | Analiza podataka |
+| Escalation, Reflexion | `ollama/nemotron-3-super` | Sigurna eskalacija |
 
 ---
 
 ### Stranica 5
 
-### 🥈 Rezervni model 1 — Kimi K2.5 Cloud
+### 🥈 Rezervni model 1 — MiniMax M2.5 Cloud
 ```
-Ime modela: ollama/kimi-k2.5:cloud
+Ime modela: ollama/minimax-m2.5
 ```
 
 **Za šta se koristi:**
-- Preuzima sve zadatke ako MiniMax M2.5 nije dostupan
-- Kreativno pisanje, Reel koncepti, Story ideje
+- Preuzima sve zadatke ako GLM-5 nije dostupan
+- Posebno dobar za duže tekstove i analize
 - Izvještaji i analytics
 
-**Kada se aktivira:** Automatski, ako MiniMax M2.5 ne odgovori u roku od 30 sekundi.
+**Kada se aktivira:** Automatski, ako GLM-5 ne odgovori u roku od 30 sekundi.
 
 ---
 
-### 🔄 Rezervni model 2 — Qwen 3.5 Uncensored Cloud
+### 🥉 Rezervni model 2 — Kimi K2.5 Cloud
+```
+Ime modela: ollama/kimi-k2.5
+```
+
+**Za šta se koristi:**
+- Treća linija odbrane ako prethodni modeli nisu dostupni
+- Kreativno pisanje, Reel koncepti, Story ideje
+
+**Kada se aktivira:** Automatski, ako prva dva modela ne odgovaraju.
+
+---
+
+### 🔄 Rezervni model 3 — Qwen 3.5 Uncensored Cloud
 ```
 Ime modela: ollama/qwen3.5:397b
 ```
@@ -140,7 +151,14 @@ Ime modela: ollama/qwen3.5:397b
 - Zadnja rezerva za sve zadatke
 - Bez filtera — može pisati direktniji marketinški sadržaj
 
-**Kada se aktivira:** Automatski, ako Kimi K2.5 ne odgovara.
+**Kada se aktivira:** Samo ako sva tri prethodna modela nisu dostupna.
+
+---
+
+### 📝 Napomena o slikama
+
+GLM-5 je multimodalni model — razumije i tekst i slike bez posebnog Vision modela.
+Kada kupac pošalje sliku, GLM-5 je direktno obrađuje.
 
 ---
 
@@ -149,7 +167,7 @@ Ime modela: ollama/qwen3.5:397b
 Ako želiš ručno odabrati model:
 1. Otvori Dashboard
 2. Klikni na **Chat**
-3. Vidi dropdown na vrhu: **"Default (minimax-m2.5:cloud)"**
+3. Vidi dropdown na vrhu: **"Default (minimax-m2.5)"**
 4. Klikni i odaberi drugi model
 
 > 💡 **Preporuka:** Ostavi na "Default" — Ava automatski bira najbolji dostupni model.
@@ -176,7 +194,7 @@ Skills su specijalizirani "djelovi" Avine inteligencije. Svaki skill je zadužen
 |--|--|
 | **Kada se aktivira** | Automatski svaki ponedjeljak u 09:00 |
 | **Također** | Kada napišeš: *"Napravi plan"*, *"Šta objavljujemo ove sedmice?"* |
-| **Model** | MiniMax M2.5 Cloud (primarni) |
+| **Model** | GLM-5 Cloud (primarni) |
 | **Trajanje** | 2–5 minuta |
 
 **Šta radi:**
@@ -201,7 +219,7 @@ Skills su specijalizirani "djelovi" Avine inteligencije. Svaki skill je zadužen
 |--|--|
 | **Kada se aktivira** | Automatski nakon što odobravaš plan |
 | **Također** | Kada napišeš: *"Napiši Instagram post o..."*, *"Napiši caption za..."* |
-| **Model** | MiniMax M2.5 Cloud (primarni) |
+| **Model** | GLM-5 Cloud (primarni) |
 | **Trajanje** | 30 sekundi po postu |
 
 **Šta radi:**
@@ -218,7 +236,7 @@ Skills su specijalizirani "djelovi" Avine inteligencije. Svaki skill je zadužen
 |--|--|
 | **Kada se aktivira** | Automatski nakon Writer-a |
 | **Ručno** | Kada napišeš: *"Provjeri ovaj tekst"* |
-| **Model** | MiniMax M2.5 Cloud (primarni) |
+| **Model** | GLM-5 Cloud (primarni) |
 | **Trajanje** | 10–20 sekundi po postu |
 
 **Šta provjerava:**
@@ -252,7 +270,7 @@ Skills su specijalizirani "djelovi" Avine inteligencije. Svaki skill je zadužen
 |--|--|
 | **Kada se aktivira** | Svako primanje poruke na Facebook/Instagram |
 | **Automatska provjera** | Svake 15 minuta |
-| **Model** | MiniMax M2.5 Cloud (primarni) |
+| **Model** | GLM-5 Cloud (primarni) |
 | **Trajanje** | 5–15 sekundi |
 
 **Šta radi:**
@@ -269,7 +287,7 @@ Skills su specijalizirani "djelovi" Avine inteligencije. Svaki skill je zadužen
 |--|--|
 | **Kada se aktivira** | Automatski svaki dan u 10:00 |
 | **Okidač** | Kada Inbox klasificira poruku kao "lead" |
-| **Model** | MiniMax M2.5 Cloud (primarni) |
+| **Model** | GLM-5 Cloud (primarni) |
 | **Trajanje** | 1–3 minute |
 
 **Šta radi:**
@@ -303,7 +321,7 @@ Skills su specijalizirani "djelovi" Avine inteligencije. Svaki skill je zadužen
 | | |
 |--|--|
 | **Kada se aktivira** | Automatski svake nedjelje u 02:00 |
-| **Model** | MiniMax M2.5 Cloud (primarni) |
+| **Model** | GLM-5 Cloud (primarni) |
 | **Trajanje** | 5–15 minuta |
 
 **Šta radi:**
@@ -319,7 +337,7 @@ Skills su specijalizirani "djelovi" Avine inteligencije. Svaki skill je zadužen
 | | |
 |--|--|
 | **Kada se aktivira** | Kada Reviewer pronađe rizik, ili nejasne poruke |
-| **Model** | MiniMax M2.5 Cloud |
+| **Model** | GLM-5 Cloud |
 | **Trajanje** | Odmah — hitna obavijest |
 
 **Šta radi:**
@@ -334,7 +352,7 @@ Skills su specijalizirani "djelovi" Avine inteligencije. Svaki skill je zadužen
 | | |
 |--|--|
 | **Kada se aktivira** | Automatski svaki dan u 23:00 |
-| **Model** | MiniMax M2.5 Cloud |
+| **Model** | GLM-5 Cloud |
 | **Trajanje** | 2–5 minuta |
 
 **Šta radi:**
@@ -471,7 +489,7 @@ https://hetzner4-marki.tail47b17c.ts.net/#token=5d936f9c51be19d5d6b912092dd7dd25
 **Šta vidiš:** Prozor za chat — kao WhatsApp, ali s Avom.
 
 **Skill koji se koristi:** Zavisi od pitanja — automatski odabire pravi skill
-**Model:** MiniMax M2.5 Cloud (primarni)
+**Model:** GLM-5 Cloud (primarni)
 
 **Kada koristiš:** Uvijek kada želiš nešto pitati ili naručiti Avi.
 
@@ -506,7 +524,7 @@ https://hetzner4-marki.tail47b17c.ts.net/#token=5d936f9c51be19d5d6b912092dd7dd25
 
 Otvori Dashboard → Klikni lijevo na **"Chat"**
 
-Vidiš gore **"main"** (to je Ava) i model **"minimax-m2.5:cloud"**
+Vidiš gore **"main"** (to je Ava) i model **"minimax-m2.5"**
 
 Napiši svoju poruku dole i pritisni Enter.
 
@@ -518,10 +536,10 @@ Napiši svoju poruku dole i pritisni Enter.
 
 | Šta pišeš | Šta Ava radi | Model |
 |-----------|-------------|-------|
-| `"Šta objavljujemo ove sedmice?"` | Kreira 7-dnevni plan | MiniMax M2.5 |
-| `"Napravi plan za sljedeće 2 sedmice"` | Kreira 14-dnevni plan | MiniMax M2.5 |
-| `"Planiraj sadržaj za Ramazan"` | Tematski Ramazan plan | MiniMax M2.5 |
-| `"Napravi plan za [tema]"` | Plan po tvojoj temi | MiniMax M2.5 |
+| `"Šta objavljujemo ove sedmice?"` | Kreira 7-dnevni plan | GLM-5 |
+| `"Napravi plan za sljedeće 2 sedmice"` | Kreira 14-dnevni plan | GLM-5 |
+| `"Planiraj sadržaj za Ramazan"` | Tematski Ramazan plan | GLM-5 |
+| `"Napravi plan za [tema]"` | Plan po tvojoj temi | GLM-5 |
 
 ---
 
@@ -541,9 +559,9 @@ Napiši svoju poruku dole i pritisni Enter.
 
 | Šta pišeš | Šta Ava radi | Model |
 |-----------|-------------|-------|
-| `"Koje nove leadove imamo?"` | Prikazuje nove upite kupaca | MiniMax M2.5 |
-| `"Napiši [kupcu] follow-up poruku"` | Automatski šalje poruku | MiniMax M2.5 |
-| `"Ko još nije dobio odgovor?"` | Prikazuje otvorene upite | MiniMax M2.5 |
+| `"Koje nove leadove imamo?"` | Prikazuje nove upite kupaca | GLM-5 |
+| `"Napiši [kupcu] follow-up poruku"` | Automatski šalje poruku | GLM-5 |
+| `"Ko još nije dobio odgovor?"` | Prikazuje otvorene upite | GLM-5 |
 
 ---
 
@@ -551,10 +569,10 @@ Napiši svoju poruku dole i pritisni Enter.
 
 | Šta pišeš | Šta Ava radi | Model |
 |-----------|-------------|-------|
-| `"Napiši Instagram post o [temi]"` | Kreira caption + hashtagove | MiniMax M2.5 |
-| `"Napiši to na bosanskom/njemačkom/srpskom"` | Prevodi post | MiniMax M2.5 |
-| `"Skrati post"` | Skraćuje tekst | MiniMax M2.5 |
-| `"Napravi to formalnije/ležernije"` | Prilagođava ton | MiniMax M2.5 |
+| `"Napiši Instagram post o [temi]"` | Kreira caption + hashtagove | GLM-5 |
+| `"Napiši to na bosanskom/njemačkom/srpskom"` | Prevodi post | GLM-5 |
+| `"Skrati post"` | Skraćuje tekst | GLM-5 |
+| `"Napravi to formalnije/ležernije"` | Prilagođava ton | GLM-5 |
 
 ---
 
@@ -581,7 +599,7 @@ Kada su Meta ključevi uneseni, možeš pisati Avi direktno putem Messengera na 
 ## Kako funkcioniše automatski content plan?
 
 **SKILL koji se koristi: Planner**
-**Model: MiniMax M2.5 Cloud**
+**Model: GLM-5 Cloud**
 
 Ava automatski svaki ponedjeljak ujutro u 09:00 sati kreira plan za sljedeće 1–2 sedmice.
 
@@ -601,8 +619,8 @@ Ava ti šalje: zahtjev za odobravanje putem Messengera
 Ti odgovaraš: ✅ odobren / ✏️ promijeni / ❌ odbijen
        ↓
 Nakon odobravanja:
-[SKILL: Writer]    Piše potpune tekstove → Model: MiniMax M2.5
-[SKILL: Reviewer]  Provjera kvalitete → Model: MiniMax M2.5
+[SKILL: Writer]    Piše potpune tekstove → Model: GLM-5
+[SKILL: Reviewer]  Provjera kvalitete → Model: GLM-5
 [SKILL: Publisher] Objavljuje u Postiz → API veza
 ```
 
@@ -656,11 +674,11 @@ Ava automatski zna za:
 
 | Vrsta | Opis | Model |
 |-------|------|-------|
-| **Foto post** | Slika s captionom i hashtagovima | MiniMax M2.5 |
-| **Reel koncept** | Ideja za kratki video (scenarij) | MiniMax M2.5 |
-| **Story ideja** | Prijedlog za 24h story | MiniMax M2.5 |
-| **Tekst post** | Duži informativni tekst (dobro za Facebook) | MiniMax M2.5 |
-| **Karusel ideja** | Više slika s narativnom strukturom | MiniMax M2.5 |
+| **Foto post** | Slika s captionom i hashtagovima | GLM-5 |
+| **Reel koncept** | Ideja za kratki video (scenarij) | GLM-5 |
+| **Story ideja** | Prijedlog za 24h story | GLM-5 |
+| **Tekst post** | Duži informativni tekst (dobro za Facebook) | GLM-5 |
+| **Karusel ideja** | Više slika s narativnom strukturom | GLM-5 |
 
 ---
 
@@ -688,8 +706,8 @@ Kada dobijaš zahtjev za odobravanje putem Messengera, imaš 3 opcije:
 **Napiši:** `plan odobren`
 
 **Šta se dešava:**
-- [SKILL: Writer] Ava odmah počinje pisati sve postove → Model: MiniMax M2.5
-- [SKILL: Reviewer] Svaki post se provjerava → Model: MiniMax M2.5
+- [SKILL: Writer] Ava odmah počinje pisati sve postove → Model: GLM-5
+- [SKILL: Reviewer] Svaki post se provjerava → Model: GLM-5
 - [SKILL: Publisher] Postovi se planiraju u Postiz
 - Svaki dan u zakazano vrijeme automatski se objavljuje
 - Ne moraš ništa više raditi
@@ -709,7 +727,7 @@ Kada dobijaš zahtjev za odobravanje putem Messengera, imaš 3 opcije:
 - `promijeni: Ramazan post pomjeri na petak`
 
 **Šta se dešava:**
-- [SKILL: Planner] Ava prilagođava plan → Model: MiniMax M2.5
+- [SKILL: Planner] Ava prilagođava plan → Model: GLM-5
 - Dobijaš revidirani plan na novo odobravanje
 
 ---
@@ -899,14 +917,14 @@ Društvene mreže ponekad prekidaju vezu iz sigurnosnih razloga.
 
 | Zadatak | Kada | Skill | Model | Šta radi |
 |---------|------|-------|-------|----------|
-| **Dnevno planiranje** | Svaki dan 09:00 | Planner | MiniMax M2.5 | Provjerava da li postoji dnevni plan |
-| **Sedmično planiranje** | Pon 09:00 | Planner | MiniMax M2.5 | Kreira 2-sedmični plan, šalje na odobravanje |
-| **Lead Follow-up** | Svaki dan 10:00 | Lead-Nurturing | MiniMax M2.5 | Šalje follow-up poruke zainteresiranim |
+| **Dnevno planiranje** | Svaki dan 09:00 | Planner | GLM-5 | Provjerava da li postoji dnevni plan |
+| **Sedmično planiranje** | Pon 09:00 | Planner | GLM-5 | Kreira 2-sedmični plan, šalje na odobravanje |
+| **Lead Follow-up** | Svaki dan 10:00 | Lead-Nurturing | GLM-5 | Šalje follow-up poruke zainteresiranim |
 | **Sedmični izvještaj** | Pon 08:00 | Analytics | MiniMax M2.5 | Analizira prošlu sedmicu |
-| **Samorefleksija** | Svaki dan 23:00 | Reflexion | MiniMax M2.5 | Ava analizira dan, poboljšava se |
-| **Čišćenje memorije** | Ned 02:00 | Memory-Critic | MiniMax M2.5 | Organizira i čisti memoriju |
+| **Samorefleksija** | Svaki dan 23:00 | Reflexion | GLM-5 | Ava analizira dan, poboljšava se |
+| **Čišćenje memorije** | Ned 02:00 | Memory-Critic | GLM-5 | Organizira i čisti memoriju |
 | **Heartbeat** | Svaki sat | — | — | Sistemska provjera |
-| **Inbox provjera** | Svakih 15 min | Inbox | MiniMax M2.5 | Provjerava nove poruke |
+| **Inbox provjera** | Svakih 15 min | Inbox | GLM-5 | Provjerava nove poruke |
 
 ---
 
@@ -938,10 +956,10 @@ Ili napiši Avi u chatu:
 
 | Šta napišeš | Šta se pokrene | Skill | Model |
 |-------------|----------------|-------|-------|
-| `"Napravi odmah content plan"` | Sedmično planiranje | Planner | MiniMax M2.5 |
+| `"Napravi odmah content plan"` | Sedmično planiranje | Planner | GLM-5 |
 | `"Analiziraj naše postove prošle sedmice"` | Sedmični izvještaj | Analytics | MiniMax M2.5 |
-| `"Provjeri nove poruke kupaca"` | Inbox provjera | Inbox | MiniMax M2.5 |
-| `"Uradi samorefleksiju"` | Reflexion | Reflexion | MiniMax M2.5 |
+| `"Provjeri nove poruke kupaca"` | Inbox provjera | Inbox | GLM-5 |
+| `"Uradi samorefleksiju"` | Reflexion | Reflexion | GLM-5 |
 
 ---
 
@@ -958,14 +976,14 @@ Ili napiši Avi u chatu:
 ## Kako Ava obrađuje leadove
 
 **SKILL: Inbox + Lead-Nurturing**
-**Model: MiniMax M2.5 Cloud**
+**Model: GLM-5 Cloud**
 
 ```
 Kupac piše na tvoju Facebook stranicu
            ↓
 [SKILL: Inbox] Ava prima poruku automatski
            ↓
-[Model: MiniMax M2.5] Ava analizira: Šta ova osoba želi?
+[Model: GLM-5] Ava analizira: Šta ova osoba želi?
            ↓
 ┌────────────────────────────────────────────────┐
 │ Jednostavno pitanje → Ava odgovara odmah       │
@@ -1152,11 +1170,15 @@ Napiši Avi:
 
 ### AI modeli — pregled
 
-| Model | Uloga | Za šta |
+| Model | Skill | Za šta |
 |-------|-------|--------|
-| `ollama/minimax-m2.5:cloud` | Primarni | Sve — planiranje, pisanje, chat, inbox |
-| `ollama/kimi-k2.5:cloud` | Rezerva 1 | Kreativno pisanje |
-| `ollama/leckminartor/qwen3.5-uncensored:397b-cloud` | Rezerva 2 | Zadnja rezerva |
+| `ollama/kimi-k2.5` | inbox | Brzi odgovori, višejezičan |
+| `ollama/gemini-3-flash-preview` | publisher | Objavljivanje, API |
+| `ollama/minimax-m2.1` | writer, lead-nurturing | Kreativni tekstovi |
+| `ollama/deepseek-v3.2` | planner, reviewer, analytics, optimizer, memory-critic | Analiza, planiranje |
+| `ollama/nemotron-3-super` | escalation, reflexion | Eskalacija, refleksija |
+| `ollama/minimax-m2.5` | fallback 1 | Ako primarni nije dostupan |
+| `ollama/qwen3.5:397b` | fallback 2 | Zadnja rezerva |
 
 ---
 
@@ -1164,16 +1186,16 @@ Napiši Avi:
 
 | Skill | Kada radi | Model |
 |-------|-----------|-------|
-| Planner | Pon 09:00 + na zahtjev | MiniMax M2.5 |
-| Writer | Nakon odobrenja plana | MiniMax M2.5 |
-| Reviewer | Nakon Writer-a | MiniMax M2.5 |
-| Publisher | U zakazano vrijeme | API |
-| Inbox | Svakih 15 min | MiniMax M2.5 |
-| Lead-Nurturing | Svaki dan 10:00 | MiniMax M2.5 |
-| Analytics | Pon 08:00 + na zahtjev | MiniMax M2.5 |
-| Memory-Critic | Ned 02:00 | MiniMax M2.5 |
-| Escalation | Na rizik/alarm | MiniMax M2.5 |
-| Reflexion | Svaki dan 23:00 | MiniMax M2.5 |
+| Planner | Pon 09:00 + na zahtjev | DeepSeek V3.2 |
+| Writer | Nakon odobrenja plana | MiniMax M2.1 |
+| Reviewer | Nakon Writer-a | DeepSeek V3.2 |
+| Publisher | U zakazano vrijeme | Gemini 3 Flash |
+| Inbox | Svakih 15 min | Kimi K2.5 |
+| Lead-Nurturing | Svaki dan 10:00 | MiniMax M2.1 |
+| Analytics | Pon 08:00 + na zahtjev | DeepSeek V3.2 |
+| Memory-Critic | Ned 02:00 | DeepSeek V3.2 |
+| Escalation | Na rizik/alarm | Nemotron Super |
+| Reflexion | Svaki dan 23:00 | Nemotron Super |
 
 ---
 
@@ -1208,7 +1230,8 @@ Napiši Avi:
 ║ LEADOVI:      "Prikaži mi nove leadove"               ║
 ║ RESET:        /new ili /reset                         ║
 ╠═══════════════════════════════════════════════════════╣
-║ MODELI:  MiniMax M2.5 (primarni) | Kimi (rezerva)     ║
+║ MODELI:  GLM-5 (sve) | MiniMax (analize)              ║
+║          Vision: qwen3.5 (samo za slike)              ║
 ╚═══════════════════════════════════════════════════════╝
 ```
 

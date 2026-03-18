@@ -37,9 +37,9 @@
 | Caddy: `flush_interval -1`, `stream_timeout 24h`, `stream_close_delay 5m` | ✅ |
 | Tailscale-Cert auto-renewal: systemd timer (Tag 10+20/Monat, 03:00 UTC) | ✅ |
 | Systemd Linger root: `Linger=yes` | ✅ |
-| Primär-Modell: `ollama/glm-5:cloud` | ✅ |
-| Fallback 1: `ollama/minimax-m2.5:cloud` | ✅ |
-| Fallback 2: `ollama/kimi-k2.5:cloud` | ✅ |
+| Primär-Modell: `ollama/minimax-m2.5` (per-Skill-Routing) | ✅ |
+| Fallback 1: `ollama/kimi-k2.5` | ✅ |
+| Fallback 2: `ollama/qwen3.5:397b` | ✅ |
 | Fallback 3: `ollama/qwen3.5:397b` | ✅ |
 | Ollama Cloud API Key in systemd drop-in | ✅ |
 | Auth-Token konfiguriert | ✅ |
@@ -147,7 +147,7 @@ marki.tail47b17c.ts.net:443  (Caddy, Tailscale-Cert, auto-renewal Tag 10+20)
   ▼
 127.0.0.1:18789 — OpenClaw Gateway (loopback, hybrid-reload, trustedProxies)
   │
-  ├─► Agent "Ava" (glm-5:cloud, Fallback: minimax → kimi → qwen)
+  ├─► Agent "Ava" (per-Skill-Routing: kimi/gemini/minimax/deepseek/nemotron)
   │     └─► ~/.openclaw/workspace-social-ai/ (11 Skills)
   │
   └─► /hooks/meta → :8085 meta-bridge  ⚠️ NOCH NICHT GESTARTET
