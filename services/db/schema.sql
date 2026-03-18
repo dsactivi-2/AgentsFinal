@@ -13,17 +13,19 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- messages — Alle eingehenden und ausgehenden Nachrichten
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS messages (
-    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    platform      VARCHAR(32)  NOT NULL CHECK (platform IN ('messenger', 'instagram', 'whatsapp', 'telegram', 'test')),
-    psid          VARCHAR(128) NOT NULL,
-    direction     VARCHAR(8)   NOT NULL CHECK (direction IN ('in', 'out')),
-    content       TEXT         NOT NULL,
-    content_type  VARCHAR(32)  NOT NULL DEFAULT 'text' CHECK (content_type IN ('text', 'image', 'audio', 'video', 'file', 'sticker')),
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    platform        VARCHAR(32)  NOT NULL CHECK (platform IN ('messenger', 'instagram', 'whatsapp', 'telegram', 'test')),
+    psid            VARCHAR(128) NOT NULL,
+    direction       VARCHAR(8)   NOT NULL CHECK (direction IN ('in', 'out')),
+    content         TEXT         NOT NULL,
+    content_type    VARCHAR(32)  NOT NULL DEFAULT 'text' CHECK (content_type IN ('text', 'image', 'audio', 'video', 'file', 'sticker')),
+    media_path      VARCHAR(512),          -- Lokaler Dateipfad des gespeicherten Bildes (nur direction='in', content_type='image')
+    media_url       VARCHAR(2048),         -- Original-URL von Meta CDN oder gesendete Bild-URL (direction='out')
     meta_message_id VARCHAR(256),
-    request_id    VARCHAR(64),
-    processed     BOOLEAN      NOT NULL DEFAULT FALSE,
-    error         TEXT,
-    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    request_id      VARCHAR(64),
+    processed       BOOLEAN      NOT NULL DEFAULT FALSE,
+    error           TEXT,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_psid ON messages(psid);
