@@ -16,6 +16,10 @@ services:
       FRONTEND_URL: ${FRONTEND_URL}
       BACKEND_INTERNAL_URL: http://postiz:5000
       JWT_SECRET: ${JWT_SECRET}
+      STORAGE_PROVIDER: local
+      UPLOAD_DIRECTORY: /uploads
+    volumes:
+      - postiz_uploads:/uploads
 
   postgres:
     image: pgvector/pgvector:pg16
@@ -37,3 +41,4 @@ services:
 volumes:
   postiz_postgres_data:
   postiz_redis_data:
+  postiz_uploads:
