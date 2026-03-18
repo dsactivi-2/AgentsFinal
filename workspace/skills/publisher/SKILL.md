@@ -72,10 +72,50 @@ Bei API-Fehler:
 2. Retry nach 5 Minuten (max. 3 Versuche)
 3. Bei dauerhaftem Fehler: Eskalation + manuelle Prüfung
 
+## Media-URL Validierung (Pflicht vor Posting)
+
+Bevor Medien an Postiz übergeben werden, **jede URL prüfen**:
+
+### Checkliste
+
+| Prüfpunkt | Erwartung | Aktion bei Fehler |
+|-----------|-----------|-------------------|
+| URL erreichbar | HTTP 200 | Bild neu hochladen oder URL korrigieren |
+| Content-Type | `image/jpeg`, `image/png`, `image/webp`, `video/mp4` | Format ablehnen, Agent informieren |
+| Dateigröße | Bilder < 8 MB, Videos < 100 MB | Komprimierung anfordern |
+| URL-Schema | `https://` (kein `http://`) | URL ablehnen |
+| Verfallszeit | Keine ablaufenden URLs (z.B. Meta CDN `_nc_` params) | Bild lokal speichern + eigene stabile URL verwenden |
+
+### Implementierung (OpenClaw Tool-Call Beispiel)
+
+```
+# 1. URL-Check
+GET {media_url} → prüfe Status, Content-Type, Content-Length
+
+# 2. Falls Meta CDN URL (facebook.com, fbcdn.net, cdninstagram.com):
+#    → Bild über meta-bridge /images/{path} abrufen (lokal gespeichert)
+#    → Oder: direkt aus IMAGE_STORAGE_DIR lesen
+
+# 3. Postiz Upload (falls lokale Datei):
+POST http://127.0.0.1:4200/api/uploads
+Content-Type: multipart/form-data
+→ Erhalte stabile Postiz-interne URL
+
+# 4. Dann erst: POST /api/posts mit validierter URL
+```
+
+### Fehlercodes
+
+- `media_url_unreachable` → Bild neu generieren lassen (SKILL:writer)
+- `media_url_wrong_type` → Format nicht unterstützt, ablehnen
+- `media_url_too_large` → Komprimierung oder Alternativ-Bild anfragen
+- `media_url_insecure` → HTTP statt HTTPS, ablehnen
+
 ## Qualitätssicherung beim Publishing
 
 - Nochmals prüfen: Ist Reviewer-Freigabe vorhanden?
 - Kein Publishing ohne `status: "approved"` in Memory
+- Medien-URLs **immer validieren** (siehe oben) bevor Postiz-Aufruf
 - Bei Zweifeln: SKILL:reviewer erneut aufrufen
 
 ## Memory-Nutzung

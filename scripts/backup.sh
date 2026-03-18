@@ -153,6 +153,40 @@ backup_openclaw_memory() {
 }
 
 # =============================================================================
+# Postiz Uploads Backup (Docker Volume)
+# =============================================================================
+
+backup_postiz_uploads() {
+    info "Postiz Uploads Backup (Docker Volume)..."
+
+    if ! command -v docker &>/dev/null || ! docker info &>/dev/null 2>&1; then
+        warn "Docker nicht verfügbar — Postiz Uploads übersprungen"
+        return 0
+    fi
+
+    local volume="postiz_uploads"
+    if ! docker volume inspect "${volume}" &>/dev/null 2>&1; then
+        warn "Volume '${volume}' nicht gefunden — Postiz noch nicht gestartet?"
+        return 0
+    fi
+
+    local out="${BACKUP_DIR}/postiz_uploads_${TIMESTAMP}.tar.gz"
+    docker run --rm \
+        -v "${volume}:/uploads:ro" \
+        -v "${BACKUP_DIR}:/backup" \
+        alpine \
+        tar -czf "/backup/postiz_uploads_${TIMESTAMP}.tar.gz" -C / uploads 2>/dev/null
+
+    if [[ -f "${out}" ]]; then
+        local size
+        size=$(du -sh "${out}" | cut -f1)
+        success "Postiz Uploads: ${out} (${size})"
+    else
+        warn "Postiz Uploads: Backup fehlgeschlagen (leer?)"
+    fi
+}
+
+# =============================================================================
 # Alte Backups aufräumen (> 30 Tage)
 # =============================================================================
 
@@ -229,6 +263,7 @@ main() {
     backup_config
     backup_env
     backup_openclaw_memory
+    backup_postiz_uploads
     cleanup_old_backups
     write_manifest
     print_summary
