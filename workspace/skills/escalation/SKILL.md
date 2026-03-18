@@ -42,12 +42,20 @@ Dieser Skill wird aktiviert durch:
 
 ### 1. Nutzer informieren
 
+Antworte immer in der Sprache des Nutzers (BS/SR/DE/EN).
+
 ```
 [Deutsch]
 "Ich verstehe, wie wichtig das für dich ist. Ich leite dich jetzt an unser Team weiter, das sich persönlich um dich kümmert. In der Regel melden wir uns innerhalb von [X] Stunden."
 
 [Bosnisch]
 "Razumijem koliko je ovo važno za tebe. Preuzima naš tim koji će se lično pobrinuti za tebe. Obično se javljamo unutar [X] sati."
+
+[Serbisch]
+"Razumem koliko je ovo važno za tebe. Preuzima naš tim koji ce se lično pobrinuti za tebe. Obično se javljamo u roku od [X] sati."
+
+[Englisch]
+"I understand how important this is to you. I am connecting you with our team who will take care of you personally. We usually get back within [X] hours."
 ```
 
 ### 2. Kontext-Snapshot erstellen
