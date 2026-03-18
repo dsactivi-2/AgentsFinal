@@ -5,7 +5,8 @@ Dokumentations- und Scaffold-Repo für einen hybriden Stack aus:
 - OpenClaw (nativ)
 - Postiz (Docker Compose)
 - mem0 (nativ)
-- Redis / Postgres
+- PostgreSQL (Primary DB — Messages, Logging, Deduplizierung)
+- Redis (optional — Fallback für meta-bridge Dedup, Session-State)
 - Meta Bridge
 - Caddy
 

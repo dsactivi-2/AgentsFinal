@@ -52,8 +52,10 @@ MCP ist der primäre Integrationspfad für agentische Steuerung. CLI und direkte
 
 ## Eigene Datenhaltung
 
-- eigener Postgres für Betriebs- und Konversationsdaten
-- eigener Redis für Hot State und Queueing
+- eigener Postgres für Betriebs- und Konversationsdaten (PRIMARY: Dedup, Messages, Logging)
+- eigener Redis für Session-State Hot-Cache (OPTIONAL: Fallback für meta-bridge wenn Postgres kurzzeitig nicht erreichbar)
+
+> **Hinweis:** Postiz-Redis (Docker, interne Queues) und Stack-Redis (nativ, optionaler Fallback) sind zwei separate Instanzen. Stack-Redis ist nicht zwingend erforderlich — PostgreSQL übernimmt Deduplizierung primär.
 
 ---
 
@@ -103,7 +105,7 @@ Empfohlene Struktur:
 | mem0 | semantisches Langzeit-Memory | nativ |
 | Meta Bridge | Webhook-Eingang und Routing | nativ |
 | eigener Postgres | Konversations- und Betriebsdaten | nativ |
-| eigener Redis | Hot State, Locks, Queueing | nativ |
+| eigener Redis | Session-State Hot-Cache (OPTIONAL, Fallback für meta-bridge) | nativ |
 | Postiz | Social Publishing/Analytics | Docker Compose |
 | Postiz-DB/Redis/Worker | interne Postiz-Betriebsdienste | Docker Compose |
 

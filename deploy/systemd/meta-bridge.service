@@ -1,7 +1,7 @@
 [Unit]
 Description=Meta Bridge — Facebook/Instagram Webhook Receiver
-After=network-online.target openclaw.service postgresql.service redis.service
-Wants=network-online.target
+After=network-online.target postgresql.service
+Wants=network-online.target redis.service
 
 [Service]
 Type=simple
