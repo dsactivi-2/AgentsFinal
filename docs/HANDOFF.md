@@ -2,10 +2,11 @@
 
 ## Aktueller Stand (LIVE)
 
-**Branch:** `refactor/openclaw-conform` — 13 Commits auf GitHub
+**Branch:** `refactor/openclaw-conform` — letzter Commit `bd8f204`
 **Repo:** `git@github.com:dsactivi-2/AgentsFinal.git`
 **Server:** `178.104.64.120` (Hetzner) | Tailscale: `marki` (`100.88.196.1`)
 **Dashboard:** `https://marki.ds.activi.io/#token=4b2a2952dd46ab0c1bb4ada6568d655c7197f881eefa5f18`
+**Tailscale Dashboard:** `https://marki.tail47b17c.ts.net/#token=4b2a2952dd46ab0c1bb4ada6568d655c7197f881eefa5f18`
 
 ---
 
@@ -62,11 +63,11 @@
 ### Wichtige Commits (neueste zuerst)
 | Commit | Was |
 |---|---|
+| `bd8f204` | Gateway hardening + Caddy v2.11.2 + cert auto-renewal docs |
+| `c8a5eb7` | Self-Learning + Error Logging + Self-Healing |
 | `e9857d1` | Ads Manager entfernt, IDENTITY + SOUL bereinigt |
-| `b8b2766` | Ads Manager Skill (entfernt in nächstem Commit) |
 | `8931e84` | bootstrap.sh fix: workspace-social-ai + PID-Files |
 | `281a345` | Lead Nurturing Skill + 3 Crons + DB-Schema |
-| `7f89baa` | Reflexion Skill + Cron So 04:00 |
 
 ---
 
@@ -206,9 +207,44 @@ cd /root/social-ai && bash scripts/start-mem0-api.sh
 
 ---
 
-## Offene Entscheidungen
+## Was in dieser Session (2026-03-18) erledigt wurde
 
-1. **Meta-Tokens** — User muss diese selbst aus dem Facebook Developer Portal holen
-2. **Supermemory Key** — User muss diesen aus supermemory.ai Dashboard holen
-3. **Cron-Jobs** — via Dashboard neu einrichten (7 Jobs: planner, analytics, memory-critic, reflexion, lead-nurturing x3)
-4. **Branch mergen** — `refactor/openclaw-conform` → `main` (PR oder direkt)
+| Was | Details |
+|---|---|
+| Gateway crash-loop behoben | `loginctl enable-linger root` → user@0.service permanent |
+| Tailscale HTTPS-Cert | `tailscale cert` → `/etc/caddy/`, Caddy konfiguriert |
+| Gateway: origin not allowed | `~/.openclaw/openclaw.json` → allowedOrigins ergänzt |
+| Gateway: pairing required | `openclaw devices approve` → 2 Geräte genehmigt |
+| Gateway auf optimal konfiguriert | bind=loopback, hybrid reload, trustedProxies |
+| Caddy upgrade 2.6.2 → 2.11.2 | via offiziellem cloudsmith Repo |
+| Caddy WebSocket-Optionen | flush_interval -1, stream_timeout 24h, stream_close_delay 5m |
+| Tailscale cert auto-renewal | systemd timer (Tag 10+20/Monat) + Expiry-Check (nur wenn <30 Tage) |
+| Self-Learning: ROLE:reflexion | config/skills/reflexion.md + Cron So 04:00 |
+| Error Logging: error_logs | DB-Tabelle + meta-bridge _log_error_to_db() + /admin/errors |
+| Self-Healing: Retry + Watchdog | tenacity in mem0-api, Retry in meta-bridge, watchdog.sh |
+| Repo: strukturelle Änderungen | config/openclaw.json, HANDOFF.md, RUNBOOK.md aktualisiert |
+
+---
+
+## Offene Entscheidungen / Nächste Session
+
+### Priorität 1 — Blockiert echten Betrieb
+
+| # | Was | Wo | Aktion |
+|---|---|---|---|
+| A | Meta App Secret | developers.facebook.com → App → Einstellungen | Wert in `/root/social-ai/services/meta-bridge/.env` |
+| B | Meta Verify Token | Selbst wählen (beliebiger String) | Wert in `.env` als `META_VERIFY_TOKEN` |
+| C | Meta Page Access Token | Messenger → API-Einstellungen → Token | Wert in `.env` als `META_PAGE_ACCESS_TOKEN` |
+| D | meta-bridge starten | Nach .env befüllt | `cd /root/social-ai && bash scripts/start-meta-bridge.sh` |
+| E | Facebook Webhook | developers.facebook.com → Webhooks | URL: `https://marki.ds.activi.io/hooks/meta` |
+| F | Supermemory API Key | supermemory.ai Dashboard | In `/root/social-ai/services/mem0-api/.env` als `SUPERMEMORY_API_KEY` |
+| G | mem0-api starten | Nach .env befüllt | `bash scripts/start-mem0-api.sh` |
+
+### Priorität 2 — Verbesserungen
+
+| # | Was | Aktion |
+|---|---|---|
+| H | Cron-Jobs im Gateway | Dashboard → Agent → Scheduled Jobs (7 Jobs: planner, analytics, memory-critic, reflexion, lead-nurturing x3) |
+| I | Branch mergen | `git checkout main && git merge refactor/openclaw-conform && git push origin main` |
+| J | ADMIN_PSID | meta-bridge starten → Nachricht an Page schreiben → PSID aus Log lesen → in .env eintragen |
+| K | Memory-Entscheidung | Offene Frage: Supermemory.ai behalten oder gegen mem0 tauschen? (Recherche noch offen) |
