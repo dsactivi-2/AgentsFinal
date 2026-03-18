@@ -1,41 +1,18 @@
 {
-  "logging": {
-    "level": "info"
-  },
   "agents": {
     "defaults": {
       "model": {
-        "primary": "ollama/minimax-m2.5",
+        "primary": "ollama/minimax-m2.5:cloud",
         "fallbacks": [
-          "ollama/kimi-k2.5",
-          "ollama/qwen3.5:397b"
+          "ollama/kimi-k2.5:cloud",
+          "ollama/leckminartor/qwen3.5-uncensored:397b-cloud"
         ]
       },
       "workspace": "~/.openclaw/workspace-social-ai",
-      "compaction": {
-        "mode": "safeguard"
-      },
       "timeoutSeconds": 1800,
       "heartbeat": {
         "every": "60m"
       }
-    }
-  },
-  "commands": {
-    "native": "auto",
-    "nativeSkills": "auto",
-    "restart": true,
-    "ownerDisplay": "raw"
-  },
-  "session": {
-    "scope": "per-sender",
-    "resetTriggers": [
-      "/new",
-      "/reset"
-    ],
-    "reset": {
-      "mode": "idle",
-      "idleMinutes": 1440
     }
   },
   "hooks": {
@@ -50,24 +27,15 @@
       }
     ]
   },
-  "gateway": {
-    "mode": "local",
-    "bind": "loopback",
-    "controlUi": {
-      "allowedOrigins": [
-        "https://marki.ds.activi.io",
-        "https://marki.tail47b17c.ts.net"
-      ]
-    },
-    "auth": {
-      "mode": "token",
-      "token": "REPLACE_WITH_STRONG_TOKEN"
-    },
-    "trustedProxies": [
-      "127.0.0.1"
+  "session": {
+    "scope": "per-sender",
+    "resetTriggers": [
+      "/new",
+      "/reset"
     ],
-    "reload": {
-      "mode": "hybrid"
+    "reset": {
+      "mode": "idle",
+      "idleMinutes": 1440
     }
   },
   "plugins": {
@@ -75,12 +43,23 @@
       "memory": "memory-core"
     }
   },
-  "models": {
-    "providers": {
-      "ollama": {
-        "baseUrl": "https://ollama.com",
-        "models": []
-      }
+  "logging": {
+    "level": "info"
+  },
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback",
+    "trustedProxies": ["127.0.0.1"],
+    "reload": { "mode": "hybrid" },
+    "controlUi": {
+      "allowedOrigins": [
+        "https://YOUR_DOMAIN",
+        "https://YOUR_TAILSCALE_DOMAIN.ts.net"
+      ]
+    },
+    "auth": {
+      "mode": "token",
+      "token": "REPLACE_WITH_STRONG_TOKEN"
     }
   }
 }
