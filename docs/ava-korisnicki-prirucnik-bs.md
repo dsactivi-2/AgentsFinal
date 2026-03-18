@@ -157,18 +157,10 @@ Ime modela: ollama/leckminartor/qwen3.5-uncensored:397b-cloud
 
 ---
 
-### 👁️ Vision model — Qwen 3.5 Cloud (za slike)
-```
-Ime modela: qwen3.5:cloud
-```
+### 📝 Napomena o slikama
 
-**Za šta se koristi:**
-- **Isključivo za analizu slika**
-- Kada ti ili kupac pošalje sliku na Facebook/Instagram
-- Ava opisuje sliku tekstom i razumije šta je na njoj
-- Na osnovu opisa može odgovoriti na pitanja o slici
-
-**Primjer:** Kupac pošalje sliku proizvoda i pita za cijenu → Ava vidi sliku, prepoznaje proizvod i odgovara.
+GLM-5 je multimodalni model — razumije i tekst i slike bez posebnog Vision modela.
+Kada kupac pošalje sliku, GLM-5 je direktno obrađuje.
 
 ---
 
