@@ -1,0 +1,21 @@
+limit.customSearchAttributes.text:
+  - value: 100
+    constraints: {}
+limit.customSearchAttributes.keyword:
+  - value: 100
+    constraints: {}
+limit.customSearchAttributes.int:
+  - value: 100
+    constraints: {}
+limit.customSearchAttributes.double:
+  - value: 100
+    constraints: {}
+limit.customSearchAttributes.bool:
+  - value: 100
+    constraints: {}
+limit.customSearchAttributes.datetime:
+  - value: 100
+    constraints: {}
+limit.customSearchAttributes.keywordList:
+  - value: 100
+    constraints: {}

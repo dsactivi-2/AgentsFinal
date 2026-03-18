@@ -64,3 +64,4 @@ data/redis/
 coverage/
 htmlcov/
 .coverage
+venvs/

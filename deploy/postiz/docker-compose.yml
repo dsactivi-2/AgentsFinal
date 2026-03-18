@@ -9,6 +9,7 @@ services:
     depends_on:
       - postgres
       - redis
+      - temporal
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
@@ -18,8 +19,24 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       STORAGE_PROVIDER: local
       UPLOAD_DIRECTORY: /uploads
+      TEMPORAL_ADDRESS: temporal:7233
     volumes:
       - postiz_uploads:/uploads
+
+  temporal:
+    image: temporalio/auto-setup:1.22.3
+    restart: unless-stopped
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD}
+      POSTGRES_SEEDS: postgres
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/dynamic_config.yaml
+    depends_on:
+      - postgres
+    volumes:
+      - ./temporal-config:/etc/temporal/config/dynamicconfig
 
   postgres:
     image: pgvector/pgvector:pg16

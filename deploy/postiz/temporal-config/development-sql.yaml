@@ -1,0 +1,43 @@
+limit.maxIDLength:
+  - value: 255
+    constraints: {}
+
+system.visibilityDisableOrderByClause:
+  - value: false
+    constraints: {}
+
+frontend.visibilityMaxPageSize:
+  - value: 1000
+    constraints: {}
+
+frontend.maxSearchAttributeValueSize:
+  - value: 2048
+    constraints: {}
+
+limit.customSearchAttributes.text:
+  - value: 100
+    constraints: {}
+
+limit.customSearchAttributes.keyword:
+  - value: 100
+    constraints: {}
+
+limit.customSearchAttributes.int:
+  - value: 100
+    constraints: {}
+
+limit.customSearchAttributes.double:
+  - value: 100
+    constraints: {}
+
+limit.customSearchAttributes.bool:
+  - value: 100
+    constraints: {}
+
+limit.customSearchAttributes.datetime:
+  - value: 100
+    constraints: {}
+
+limit.customSearchAttributes.keywordList:
+  - value: 100
+    constraints: {}
