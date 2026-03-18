@@ -11,20 +11,27 @@ Neu in v2.1:
   - Retry: OpenClaw 2× mit 5s Pause bei Timeout/Fehler
   - Kein Redis — PostgreSQL ist einziges Backend (persistent, überlebt Restarts)
 
+Neu in v2.3:
+  - Bild-Speicherung: Empfangene Bilder werden lokal gespeichert (IMAGE_STORAGE_DIR)
+  - Bild-Senden: Agent kann Bilder per DM zurückschicken (image_url im /reply Endpunkt)
+  - media_path + media_url in messages-Tabelle
+
 Endpunkte:
   GET  /webhook        → Meta Webhook-Verifikation
   POST /webhook        → Eingehende Meta Events
-  POST /reply          → Interner Endpunkt für OpenClaw-Antworten
+  POST /reply          → Interner Endpunkt (text + optional image_url)
   GET  /health         → Status aller Backends
   GET  /admin/errors   → Letzte Fehler aus error_logs
 """
 
 import asyncio
+import datetime
 import hashlib
 import hmac
 import json
 import logging
 import os
+import pathlib
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -91,6 +98,9 @@ DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
 
 DEDUP_TTL: int = 300  # 5 Minuten in Sekunden
 
+IMAGE_STORAGE_DIR: str = os.getenv("IMAGE_STORAGE_DIR", "/root/social-ai/data/images")
+IMAGE_STORAGE_ENABLED: bool = bool(IMAGE_STORAGE_DIR)
+
 # ─── Runtime State ───────────────────────────────────────────────────────────
 
 _seen_ids: dict[str, float] = {}  # In-Memory Fallback-Dedup (wenn Postgres nicht erreichbar)
@@ -102,6 +112,11 @@ db_pool: Any = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global db_pool
+
+    # Bild-Speicher-Verzeichnis anlegen
+    if IMAGE_STORAGE_ENABLED:
+        pathlib.Path(IMAGE_STORAGE_DIR).mkdir(parents=True, exist_ok=True)
+        log("image_storage_ready", path=IMAGE_STORAGE_DIR)
 
     # Postgres
     if _HAS_ASYNCPG:
@@ -172,6 +187,9 @@ async def _log_message(
     content: str,
     meta_message_id: str | None = None,
     request_id: str | None = None,
+    content_type: str = "text",
+    media_path: str | None = None,
+    media_url: str | None = None,
 ) -> None:
     """
     Schreibt Nachricht in messages-Tabelle (aus schema.sql).
@@ -184,14 +202,17 @@ async def _log_message(
             await conn.execute(
                 """
                 INSERT INTO messages
-                    (platform, psid, direction, content,
-                     meta_message_id, request_id, processed)
-                VALUES ($1, $2, $3, $4, $5, $6, true)
+                    (platform, psid, direction, content, content_type,
+                     media_path, media_url, meta_message_id, request_id, processed)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
                 """,
                 platform,
                 psid,
                 direction,
                 content[:10_000],
+                content_type,
+                media_path,
+                media_url,
                 meta_message_id,
                 request_id,
             )
@@ -305,13 +326,14 @@ async def _send_meta_with_retry(
 
 # ─── Vision: Bildbeschreibung via Ollama ─────────────────────────────────────
 
-async def _describe_image(image_url: str, page_token: str = "") -> str | None:
+async def _describe_image(image_url: str, page_token: str = "") -> tuple[str | None, str | None]:
     """
-    Downloads image from Meta CDN and sends to qwen3.5:cloud for description.
-    Returns text description or None on failure.
+    Downloads image from Meta CDN, saves to IMAGE_STORAGE_DIR, and sends to
+    qwen3.5:cloud for description.
+    Returns (description, local_path) — both can be None on failure.
     """
-    if not VISION_ENABLED or not _HAS_PILLOW:
-        return None
+    if not _HAS_PILLOW:
+        return None, None
     try:
         # Download image (Meta URLs need page token)
         params = {}
@@ -321,14 +343,30 @@ async def _describe_image(image_url: str, page_token: str = "") -> str | None:
             img_resp = await client.get(image_url, params=params, follow_redirects=True)
         if img_resp.status_code != 200:
             log_error("vision_download_failed", status=img_resp.status_code, url=image_url[:60])
-            return None
+            return None, None
 
         # Resize with Pillow (max 1024px, JPEG)
         img = Image.open(io.BytesIO(img_resp.content)).convert("RGB")
         img.thumbnail((1024, 1024), Image.LANCZOS)
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=85)
-        img_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+        img_bytes = buf.getvalue()
+
+        # Save image to disk
+        local_path: str | None = None
+        if IMAGE_STORAGE_ENABLED:
+            date_dir = pathlib.Path(IMAGE_STORAGE_DIR) / datetime.date.today().strftime("%Y%m%d")
+            date_dir.mkdir(parents=True, exist_ok=True)
+            file_path = date_dir / f"{uuid.uuid4()}.jpg"
+            file_path.write_bytes(img_bytes)
+            local_path = str(file_path)
+            log("image_saved", path=local_path)
+
+        # Vision description (optional — only if API key set)
+        if not VISION_ENABLED:
+            return None, local_path
+
+        img_b64 = base64.b64encode(img_bytes).decode("utf-8")
 
         # Call qwen3.5:cloud via Ollama API
         async with httpx.AsyncClient(timeout=30) as client:
@@ -347,23 +385,25 @@ async def _describe_image(image_url: str, page_token: str = "") -> str | None:
             )
         if vision_resp.status_code != 200:
             log_error("vision_api_failed", status=vision_resp.status_code)
-            return None
+            return None, local_path
 
         description = vision_resp.json().get("message", {}).get("content", "").strip()
         log("vision_ok", model=VISION_MODEL, chars=len(description))
-        return description or None
+        return description or None, local_path
 
     except Exception as exc:
         log_error("vision_exception", error=str(exc))
-        return None
+        return None, None
 
 
-async def _process_attachments(attachments: list) -> str:
+async def _process_attachments(attachments: list) -> tuple[str, list[str]]:
     """
-    Processes image attachments and returns combined text description.
+    Processes image attachments: saves to disk and generates text descriptions.
+    Returns (combined_description, list_of_local_paths).
     Skips non-image attachments.
     """
-    descriptions = []
+    descriptions: list[str] = []
+    saved_paths: list[str] = []
     for att in attachments:
         att_type = att.get("type", "")
         if att_type not in ("image", "photo"):
@@ -371,10 +411,12 @@ async def _process_attachments(attachments: list) -> str:
         url = att.get("payload", {}).get("url", "")
         if not url:
             continue
-        desc = await _describe_image(url, page_token=PAGE_ACCESS_TOKEN)
+        desc, local_path = await _describe_image(url, page_token=PAGE_ACCESS_TOKEN)
+        if local_path:
+            saved_paths.append(local_path)
         if desc:
             descriptions.append(f"[Bild: {desc}]")
-    return " ".join(descriptions)
+    return " ".join(descriptions), saved_paths
 
 
 # ─── Payload-Normalisierung ──────────────────────────────────────────────────
@@ -459,10 +501,12 @@ async def _process_event(event: dict, request_id: str) -> None:
         has_text=bool(event.get("text")),
     )
 
-    # Vision: Bilder verarbeiten bevor OpenClaw
+    # Bilder verarbeiten (speichern + Vision-Beschreibung) bevor OpenClaw
     image_text = ""
-    if event.get("attachments") and VISION_ENABLED:
-        image_text = await _process_attachments(event["attachments"])
+    saved_image_paths: list[str] = []
+    attachments = event.get("attachments", [])
+    if attachments:
+        image_text, saved_image_paths = await _process_attachments(attachments)
         if image_text:
             log("vision_processed", request_id=request_id, chars=len(image_text))
 
@@ -472,6 +516,14 @@ async def _process_event(event: dict, request_id: str) -> None:
     if image_text:
         combined_text = (raw_text + "\n" + image_text).strip() if raw_text else image_text
 
+    # Content-Type und Media-Metadaten für Logging bestimmen
+    has_images = any(a.get("type") in ("image", "photo") for a in attachments)
+    first_media_url = (
+        attachments[0].get("payload", {}).get("url")
+        if attachments and has_images
+        else None
+    )
+
     # Eingehende Nachricht in Postgres loggen
     await _log_message(
         psid,
@@ -480,6 +532,9 @@ async def _process_event(event: dict, request_id: str) -> None:
         combined_text or "[attachment]",
         meta_message_id=event.get("message_id"),
         request_id=request_id,
+        content_type="image" if has_images else "text",
+        media_path=saved_image_paths[0] if saved_image_paths else None,
+        media_url=first_media_url,
     )
 
     openclaw_payload = {
@@ -564,7 +619,7 @@ async def _process_event(event: dict, request_id: str) -> None:
 
 # ─── FastAPI App ──────────────────────────────────────────────────────────────
 
-app = FastAPI(title="meta-bridge", version="2.2.0", lifespan=lifespan)
+app = FastAPI(title="meta-bridge", version="2.3.0", lifespan=lifespan)
 
 
 @app.get("/health")
@@ -573,7 +628,7 @@ async def health() -> dict:
     return {
         "ok": True,
         "service": "meta-bridge",
-        "version": "2.2.0",
+        "version": "2.3.0",
         "postgres": db_pool is not None,
     }
 
