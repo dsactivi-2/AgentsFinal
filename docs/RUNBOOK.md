@@ -52,10 +52,7 @@ MCP ist der primäre Integrationspfad für agentische Steuerung. CLI und direkte
 
 ## Eigene Datenhaltung
 
-- eigener Postgres für Betriebs- und Konversationsdaten (PRIMARY: Dedup, Messages, Logging)
-- eigener Redis für Session-State Hot-Cache (OPTIONAL: Fallback für meta-bridge wenn Postgres kurzzeitig nicht erreichbar)
-
-> **Hinweis:** Postiz-Redis (Docker, interne Queues) und Stack-Redis (nativ, optionaler Fallback) sind zwei separate Instanzen. Stack-Redis ist nicht zwingend erforderlich — PostgreSQL übernimmt Deduplizierung primär.
+- eigener Postgres für Betriebs- und Konversationsdaten (Dedup, Messages, Error-Logging)
 
 ---
 
@@ -105,7 +102,6 @@ Empfohlene Struktur:
 | mem0 | semantisches Langzeit-Memory | nativ |
 | Meta Bridge | Webhook-Eingang und Routing | nativ |
 | eigener Postgres | Konversations- und Betriebsdaten | nativ |
-| eigener Redis | Session-State Hot-Cache (OPTIONAL, Fallback für meta-bridge) | nativ |
 | Postiz | Social Publishing/Analytics | Docker Compose |
 | Postiz-DB/Redis/Worker | interne Postiz-Betriebsdienste | Docker Compose |
 
@@ -128,7 +124,6 @@ Empfohlene Struktur:
 ## 2. Eigene Datenhaltung bereitstellen
 
 - eigenen Postgres installieren und absichern
-- eigenen Redis installieren und absichern
 - Datenbank, Benutzer und Passwörter anlegen
 
 ## 3. OpenClaw installieren
@@ -182,21 +177,20 @@ Empfohlene Struktur:
 ## Zuerst
 
 1. eigener Postgres
-2. eigener Redis
-3. Docker
-4. Postiz Compose Stack
+2. Docker
+3. Postiz Compose Stack
 
 ## Dann
 
-5. mem0
-6. OpenClaw
-7. Meta Bridge
-8. Caddy
+4. mem0
+5. OpenClaw
+6. Meta Bridge
+7. Caddy
 
 ## Warum diese Reihenfolge?
 
 - Datenhaltung zuerst
-- danach Dienste mit Datenbank-/Cache-Abhängigkeit
+- danach Dienste mit Datenbank-Abhängigkeit
 - öffentliche Eintrittspunkte zuletzt
 
 ---
@@ -213,8 +207,7 @@ Empfohlene Struktur:
 
 ## Dann
 
-6. Redis
-7. Postgres
+6. Postgres
 
 Damit werden zuerst öffentliche Eingänge geschlossen und erst danach interne Abhängigkeiten beendet.
 
@@ -237,7 +230,6 @@ Damit werden zuerst öffentliche Eingänge geschlossen und erst danach interne A
 - `systemctl status openclaw`
 - `systemctl status mem0`
 - `systemctl status meta-bridge`
-- `systemctl status redis`
 - `systemctl status postgresql`
 
 ### Docker Compose
@@ -498,14 +490,13 @@ Deployments sollen klein, reversibel und testbar sein.
 
 1. frische Maschine oder gesicherte Zielumgebung vorbereiten
 2. Konfigurationsdateien zurückspielen
-3. Datenbanken wiederherstellen
-4. Redis nur bei Bedarf aus Backup, meist nicht primär nötig
-5. Postiz Stack starten
-6. OpenClaw starten
-7. mem0 starten
-8. Meta Bridge starten
-9. Caddy aktivieren
-10. End-to-End-Test fahren
+3. Postgres wiederherstellen
+4. Postiz Stack starten
+5. OpenClaw starten
+6. mem0 starten
+7. Meta Bridge starten
+8. Caddy aktivieren
+9. End-to-End-Test fahren
 
 ---
 
@@ -614,14 +605,7 @@ Prüfen:
 - wurde überhaupt etwas sinnvoll gespeichert?
 - Query zu breit oder zu eng?
 
-## 5. Redis-Probleme
-
-Prüfen:
-- Speichergrenze?
-- Verbindung lokal erreichbar?
-- falsche DB/Namespace-Nutzung?
-
-## 6. Postgres-Probleme
+## 5. Postgres-Probleme
 
 Prüfen:
 - Verbindungen erschöpft?
@@ -688,7 +672,7 @@ Ein gesunder Stack bedeutet:
 - Postiz MCP ist erreichbar
 - Meta Bridge nimmt Events an
 - mem0 kann schreiben und suchen
-- Postgres und Redis sind stabil
+- Postgres ist stabil
 - keine dauerhaften Fehler-Schleifen oder Crash-Restarts
 
 ---

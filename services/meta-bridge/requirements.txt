@@ -2,6 +2,5 @@ fastapi
 uvicorn[standard]
 httpx
 python-dotenv
-redis[asyncio]
 asyncpg
 Pillow

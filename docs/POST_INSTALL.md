@@ -3,7 +3,7 @@
 **Social AI Stack — Agent Ava**
 After running `bootstrap.sh`, complete these steps to go live.
 
-Prerequisites: OpenClaw, Caddy, PostgreSQL are already running. Redis ist optional (Fallback für meta-bridge falls PostgreSQL kurzzeitig nicht erreichbar).
+Prerequisites: OpenClaw, Caddy, PostgreSQL are already running.
 
 ---
 

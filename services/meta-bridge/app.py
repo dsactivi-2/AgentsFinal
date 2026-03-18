@@ -4,13 +4,12 @@ Meta Bridge v2 — Bidirektionale Meta Webhook Bridge für Facebook/Instagram/Me
 Neu in v2:
   - Postgres: Deduplizierung via processed_events-Tabelle (PRIMARY KEY = kein Duplikat möglich)
   - Postgres: Nachrichten-Logging (messages-Tabelle) + graceful fallback
-  - Redis: Optionaler Fallback für Dedup wenn Postgres nicht verfügbar
-  - Beide Backends sind optional; Bridge läuft auch ohne sie.
 
 Neu in v2.1:
   - Error-Logging: Alle Fehler in error_logs-Tabelle + strukturiertes stderr
   - Retry: Meta Graph API 2× mit Backoff (3s → 6s)
   - Retry: OpenClaw 2× mit 5s Pause bei Timeout/Fehler
+  - Kein Redis — PostgreSQL ist einziges Backend (persistent, überlebt Restarts)
 
 Endpunkte:
   GET  /webhook        → Meta Webhook-Verifikation
@@ -42,14 +41,6 @@ try:
     _HAS_PILLOW = True
 except ImportError:
     _HAS_PILLOW = False
-
-# ─── Optionale Backends (graceful degradation) ───────────────────────────────
-
-try:
-    import redis.asyncio as aioredis  # type: ignore
-    _HAS_REDIS = True
-except ImportError:
-    _HAS_REDIS = False
 
 try:
     import asyncpg  # type: ignore
@@ -92,8 +83,6 @@ VISION_ENABLED: bool = bool(OLLAMA_CLOUD_API_KEY)
 OPENCLAW_TIMEOUT: float = float(os.getenv("OPENCLAW_TIMEOUT", "45"))
 META_API_TIMEOUT: float = float(os.getenv("META_API_TIMEOUT", "10"))
 
-REDIS_URL: str = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
-
 DB_HOST: str = os.getenv("DB_HOST", "127.0.0.1")
 DB_PORT: int = int(os.getenv("DB_PORT", "5432"))
 DB_NAME: str = os.getenv("DB_NAME", "social_ai")
@@ -104,8 +93,7 @@ DEDUP_TTL: int = 300  # 5 Minuten in Sekunden
 
 # ─── Runtime State ───────────────────────────────────────────────────────────
 
-_seen_ids: dict[str, float] = {}  # In-Memory Fallback-Dedup
-redis_client: Any = None
+_seen_ids: dict[str, float] = {}  # In-Memory Fallback-Dedup (wenn Postgres nicht erreichbar)
 db_pool: Any = None
 
 
@@ -113,19 +101,7 @@ db_pool: Any = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global redis_client, db_pool
-
-    # Redis
-    if _HAS_REDIS:
-        try:
-            redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
-            await redis_client.ping()
-            log("redis_connected")
-        except Exception as exc:
-            log_error("redis_unavailable", error=str(exc))
-            redis_client = None
-    else:
-        log("redis_not_installed", hint="pip install redis[asyncio]")
+    global db_pool
 
     # Postgres
     if _HAS_ASYNCPG:
@@ -149,8 +125,6 @@ async def lifespan(app: FastAPI):
 
     yield  # App läuft
 
-    if redis_client:
-        await redis_client.aclose()
     if db_pool:
         await db_pool.close()
 
@@ -161,8 +135,7 @@ async def _is_duplicate(message_id: str) -> bool:
     """
     Prüft ob message_id bereits verarbeitet wurde.
     Primär: PostgreSQL INSERT ON CONFLICT (persistent, überlebt Restarts, kein TTL nötig).
-    Fallback 1: Redis SETNX + TTL (wenn Postgres nicht verfügbar).
-    Fallback 2: In-Memory TTL-Dict (wenn beide nicht verfügbar).
+    Fallback: In-Memory TTL-Dict (wenn Postgres nicht erreichbar).
     """
     # ── Primär: PostgreSQL ────────────────────────────────────────────────────
     if db_pool:
@@ -177,22 +150,9 @@ async def _is_duplicate(message_id: str) -> bool:
                 return result == "INSERT 0 0"
         except Exception as exc:
             log_error("pg_dedup_error", error=str(exc))
-            # Fall through zu Redis
+            # Fall through zu In-Memory Fallback
 
-    # ── Fallback 1: Redis ─────────────────────────────────────────────────────
-    if redis_client:
-        try:
-            result = await redis_client.set(
-                f"meta:dedup:{message_id}",
-                "1",
-                nx=True,
-                ex=DEDUP_TTL,
-            )
-            return result is None
-        except Exception as exc:
-            log_error("redis_dedup_error", error=str(exc))
-
-    # ── Fallback 2: In-Memory ─────────────────────────────────────────────────
+    # ── Fallback: In-Memory ───────────────────────────────────────────────────
     now = time.monotonic()
     expired = [k for k, t in _seen_ids.items() if now - t > DEDUP_TTL]
     for k in expired:
@@ -604,7 +564,7 @@ async def _process_event(event: dict, request_id: str) -> None:
 
 # ─── FastAPI App ──────────────────────────────────────────────────────────────
 
-app = FastAPI(title="meta-bridge", version="2.1.0", lifespan=lifespan)
+app = FastAPI(title="meta-bridge", version="2.2.0", lifespan=lifespan)
 
 
 @app.get("/health")
@@ -613,8 +573,7 @@ async def health() -> dict:
     return {
         "ok": True,
         "service": "meta-bridge",
-        "version": "2.1.0",
-        "redis": redis_client is not None,
+        "version": "2.2.0",
         "postgres": db_pool is not None,
     }
 
