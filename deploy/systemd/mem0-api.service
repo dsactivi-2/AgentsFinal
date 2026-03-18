@@ -1,16 +1,19 @@
 [Unit]
-Description=mem0 API
+Description=mem0 Memory API
 After=network-online.target postgresql.service redis.service
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=agentops
-WorkingDirectory=/opt/agentops/services/mem0-api
-EnvironmentFile=/opt/agentops/secrets/mem0.env
-ExecStart=/opt/agentops/services/mem0-api/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8010
+User=root
+WorkingDirectory=/root/social-ai
+EnvironmentFile=/root/social-ai/services/mem0-api/.env
+ExecStart=/usr/bin/bash /root/social-ai/scripts/start-mem0-api.sh
+ExecStop=/usr/bin/bash -c 'kill $(cat /tmp/mem0-api.pid) 2>/dev/null || true'
 Restart=always
 RestartSec=5
+StandardOutput=append:/root/social-ai/logs/mem0-api.log
+StandardError=append:/root/social-ai/logs/mem0-api.log
 
 [Install]
 WantedBy=multi-user.target

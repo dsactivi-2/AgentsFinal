@@ -47,16 +47,22 @@ nano /root/social-ai/services/mem0-api/.env
 
 ---
 
-## Step 2 — Apply Database Schema
+## Step 2 — Apply Database Schema + Install Dependencies
 
-Run this once to create all tables (safe to re-run, uses `CREATE TABLE IF NOT EXISTS`):
+`bootstrap.sh` already runs both steps automatically. If you need to run them manually (e.g. after pulling new changes):
 
 ```bash
 cd /root/social-ai
+
+# Re-apply schema (safe, uses CREATE TABLE IF NOT EXISTS)
 psql -U postgres -d social_ai < services/db/schema.sql
+
+# Re-install dependencies for both services
+pip install -r services/meta-bridge/requirements.txt
+pip install -r services/mem0-api/requirements.txt
 ```
 
-Verify the `error_logs` table was created:
+Verify the `error_logs` table exists:
 
 ```bash
 psql -U postgres -d social_ai -c "\dt"
@@ -64,25 +70,7 @@ psql -U postgres -d social_ai -c "\dt"
 
 ---
 
-## Step 3 — Install Python Dependencies
-
-meta-bridge requires Pillow (image processing for Facebook/Instagram):
-
-```bash
-cd /root/social-ai/services/meta-bridge
-pip install -r requirements.txt
-```
-
-mem0-api (tenacity retry logic):
-
-```bash
-cd /root/social-ai/services/mem0-api
-pip install -r requirements.txt
-```
-
----
-
-## Step 4 — Start Services
+## Step 3 — Start Services
 
 Start all three services in order:
 
@@ -149,21 +137,23 @@ bash /root/social-ai/scripts/start-meta-bridge.sh
 
 ## Step 7 — Set Up Cron Jobs in OpenClaw Dashboard
 
+All 7 cron jobs are defined in **`config/crons.json`** — use that file as reference.
+
 Navigate to: **Dashboard → Agent (main) → Scheduled Jobs**
 
-Add these 7 jobs:
+Add each job from `config/crons.json`:
 
-| Job ID | Schedule | Message to Agent |
+| Job ID | Schedule | When |
 |---|---|---|
-| `planner-daily` | `0 2 * * *` | `ROLE:planner — Tagesplanung: Erstelle Content-Plan für heute basierend auf Analytics und aktuellen Trends.` |
-| `analytics-daily` | `0 1 * * *` | `ROLE:analytics — Tagesauswertung: Analysiere Performance der letzten 24h. Speichere Erkenntnisse in Memory.` |
-| `memory-critic-weekly` | `0 3 * * 0` | `ROLE:memory-critic — Wöchentliche Memory-Prüfung: Veraltete oder fehlerhafte Einträge bereinigen.` |
-| `reflexion-weekly` | `0 4 * * 0` | `ROLE:reflexion — Wöchentliche Selbstreflexion: Analysiere letzte 7 Tage Outputs aller Rollen. Welche performen gut, welche schlecht? Speichere skill_improvement Einträge pro Rolle + reflexion_report.` |
-| `lead-nurturing-morning` | `0 9 * * 1-5` | `ROLE:lead-nurturing — Morgen-Check: Welche Leads brauchen heute Follow-up? Erstelle Nachrichten.` |
-| `lead-nurturing-midday` | `0 12 * * 1-5` | `ROLE:lead-nurturing — Mittagscheck: Offene Lead-Antworten prüfen, Eskalationen identifizieren.` |
-| `lead-nurturing-evening` | `0 18 * * 1-5` | `ROLE:lead-nurturing — Abendcheck: Tages-Zusammenfassung Lead-Aktivität. Nächste Schritte planen.` |
+| `planner-daily` | `0 2 * * *` | Daily 02:00 Berlin |
+| `analytics-daily` | `0 1 * * *` | Daily 01:00 Berlin |
+| `memory-critic-weekly` | `0 3 * * 0` | Sunday 03:00 Berlin |
+| `reflexion-weekly` | `0 4 * * 0` | Sunday 04:00 Berlin |
+| `lead-nurturing-morning` | `0 9 * * 1-5` | Weekdays 09:00 Berlin |
+| `lead-nurturing-midday` | `0 12 * * 1-5` | Weekdays 12:00 Berlin |
+| `lead-nurturing-evening` | `0 18 * * 1-5` | Weekdays 18:00 Berlin |
 
-Timezone: `Europe/Berlin`
+Copy the `message` field for each job from `config/crons.json`. Timezone: `Europe/Berlin`.
 
 ---
 

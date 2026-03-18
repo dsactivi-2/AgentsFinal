@@ -1,0 +1,62 @@
+{
+  "_comment": "Cron job definitions for Agent Ava — enter these via OpenClaw Dashboard → Agent (main) → Scheduled Jobs",
+  "_timezone": "Europe/Berlin",
+  "jobs": [
+    {
+      "id": "planner-daily",
+      "schedule": "0 2 * * *",
+      "agentId": "main",
+      "message": "ROLE:planner — Tagesplanung: Erstelle Content-Plan für heute basierend auf Analytics und aktuellen Trends. Berücksichtige aktive Kampagnen und Zielgruppen-Insights.",
+      "timezone": "Europe/Berlin",
+      "description": "Daily content planning — runs at 02:00 Berlin time"
+    },
+    {
+      "id": "analytics-daily",
+      "schedule": "0 1 * * *",
+      "agentId": "main",
+      "message": "ROLE:analytics — Tagesauswertung: Analysiere Performance der letzten 24h (Reichweite, Engagement, Lead-Konversionen). Speichere Top-3-Erkenntnisse als analytics_report in Memory.",
+      "timezone": "Europe/Berlin",
+      "description": "Daily analytics report — runs at 01:00 Berlin time"
+    },
+    {
+      "id": "memory-critic-weekly",
+      "schedule": "0 3 * * 0",
+      "agentId": "main",
+      "message": "ROLE:memory-critic — Wöchentliche Memory-Prüfung: Identifiziere veraltete, widersprüchliche oder fehlerhafte Einträge. Markiere zur Löschung oder korrigiere direkt.",
+      "timezone": "Europe/Berlin",
+      "description": "Weekly memory cleanup — runs Sunday at 03:00 Berlin time"
+    },
+    {
+      "id": "reflexion-weekly",
+      "schedule": "0 4 * * 0",
+      "agentId": "main",
+      "message": "ROLE:reflexion — Wöchentliche Selbstreflexion: Analysiere letzte 7 Tage Outputs aller Rollen (planner/writer/reviewer/publisher/analytics/optimizer/inbox). Welche performen gut, welche schlecht? Speichere skill_improvement Einträge pro Rolle + reflexion_report.",
+      "timezone": "Europe/Berlin",
+      "description": "Weekly self-reflection — runs Sunday at 04:00 Berlin time (after memory-critic)"
+    },
+    {
+      "id": "lead-nurturing-morning",
+      "schedule": "0 9 * * 1-5",
+      "agentId": "main",
+      "message": "ROLE:lead-nurturing — Morgen-Check (09:00): Welche Leads brauchen heute Follow-up? Priorität nach Interesse-Score und letztem Kontakt. Erstelle personalisierten Nachrichtenvorschlag.",
+      "timezone": "Europe/Berlin",
+      "description": "Lead nurturing morning check — weekdays at 09:00 Berlin time"
+    },
+    {
+      "id": "lead-nurturing-midday",
+      "schedule": "0 12 * * 1-5",
+      "agentId": "main",
+      "message": "ROLE:lead-nurturing — Mittagscheck (12:00): Offene Lead-Antworten der letzten 3h prüfen. Eskalationen identifizieren (keine Antwort >24h bei warmen Leads). Status in DB aktualisieren.",
+      "timezone": "Europe/Berlin",
+      "description": "Lead nurturing midday check — weekdays at 12:00 Berlin time"
+    },
+    {
+      "id": "lead-nurturing-evening",
+      "schedule": "0 18 * * 1-5",
+      "agentId": "main",
+      "message": "ROLE:lead-nurturing — Abendcheck (18:00): Tages-Zusammenfassung Lead-Aktivität. Neue Leads qualifizieren. Nächste Schritte für morgen planen und in Memory speichern.",
+      "timezone": "Europe/Berlin",
+      "description": "Lead nurturing evening check — weekdays at 18:00 Berlin time"
+    }
+  ]
+}

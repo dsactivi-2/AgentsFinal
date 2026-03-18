@@ -1,16 +1,19 @@
 [Unit]
-Description=Meta Bridge
-After=network-online.target openclaw.service
+Description=Meta Bridge — Facebook/Instagram Webhook Receiver
+After=network-online.target openclaw.service postgresql.service redis.service
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=agentops
-WorkingDirectory=/opt/agentops/services/meta-bridge
-EnvironmentFile=/opt/agentops/secrets/meta-bridge.env
-ExecStart=/opt/agentops/services/meta-bridge/.venv/bin/uvicorn app:app --host 127.0.0.1 --port 8085
+User=root
+WorkingDirectory=/root/social-ai
+EnvironmentFile=/root/social-ai/services/meta-bridge/.env
+ExecStart=/usr/bin/bash /root/social-ai/scripts/start-meta-bridge.sh
+ExecStop=/usr/bin/bash -c 'kill $(cat /tmp/meta-bridge.pid) 2>/dev/null || true'
 Restart=always
 RestartSec=5
+StandardOutput=append:/root/social-ai/logs/meta-bridge.log
+StandardError=append:/root/social-ai/logs/meta-bridge.log
 
 [Install]
 WantedBy=multi-user.target

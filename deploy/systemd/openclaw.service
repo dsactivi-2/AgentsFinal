@@ -5,9 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=agentops
-WorkingDirectory=/opt/agentops
-Environment=HOME=/opt/agentops
+User=root
+WorkingDirectory=/root/social-ai
+Environment=HOME=/root
 ExecStart=/usr/bin/env bash -lc 'openclaw gateway'
 Restart=always
 RestartSec=5
