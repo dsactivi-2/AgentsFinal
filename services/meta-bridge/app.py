@@ -324,6 +324,62 @@ async def _send_meta_with_retry(
     return False
 
 
+# ─── Meta Graph API: Bild senden ─────────────────────────────────────────────
+
+async def send_meta_media(
+    recipient_psid: str,
+    image_url: str,
+    platform: str = "messenger",
+    request_id: str | None = None,
+) -> bool:
+    """
+    Sendet ein Bild via Meta Graph API (attachment upload by URL).
+    Loggt ausgehende Nachricht mit content_type='image' in Postgres.
+    """
+    payload = {
+        "recipient": {"id": recipient_psid},
+        "message": {
+            "attachment": {
+                "type": "image",
+                "payload": {
+                    "url": image_url,
+                    "is_reusable": False,
+                },
+            }
+        },
+        "messaging_type": "RESPONSE",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=META_API_TIMEOUT) as client:
+            resp = await client.post(
+                META_GRAPH_URL,
+                params={"access_token": PAGE_ACCESS_TOKEN},
+                json=payload,
+            )
+        if resp.status_code == 200:
+            log("meta_media_send_ok", psid=recipient_psid[:8] + "***")
+            await _log_message(
+                recipient_psid,
+                platform,
+                "out",
+                "[image]",
+                request_id=request_id,
+                content_type="image",
+                media_url=image_url,
+            )
+            return True
+        log_error(
+            "meta_media_send_failed",
+            status=resp.status_code,
+            body=resp.text[:200],
+            psid=recipient_psid[:8] + "***",
+        )
+        return False
+    except Exception as exc:
+        log_error("meta_media_send_exception", error=str(exc))
+        return False
+
+
 # ─── Vision: Bildbeschreibung via Ollama ─────────────────────────────────────
 
 async def _describe_image(image_url: str, page_token: str = "") -> tuple[str | None, str | None]:
@@ -722,7 +778,8 @@ async def receive_webhook(
 async def receive_reply(request: Request) -> dict:
     """
     Interner Endpunkt: OpenClaw kann hierüber Antworten asynchron zurückschicken.
-    Erwartet: {"psid": "...", "text": "...", "platform": "messenger"}
+    Erwartet: {"psid": "...", "text": "...", "platform": "messenger", "image_url": "..." (optional)}
+    text und image_url können kombiniert werden; mindestens eines muss gesetzt sein.
     """
     try:
         data = await request.json()
@@ -731,14 +788,20 @@ async def receive_reply(request: Request) -> dict:
 
     psid = data.get("psid", "").strip()
     text = data.get("text", "").strip()
+    image_url = data.get("image_url", "").strip()
     platform = data.get("platform", "messenger").strip()
 
     if not psid:
         raise HTTPException(status_code=422, detail="psid is required")
-    if not text:
-        raise HTTPException(status_code=422, detail="text is required")
+    if not text and not image_url:
+        raise HTTPException(status_code=422, detail="text or image_url is required")
     if platform not in ("messenger", "instagram", "whatsapp", "test"):
         raise HTTPException(status_code=422, detail=f"Unknown platform: {platform}")
 
-    success = await send_meta_message(psid, text, platform=platform)
-    return {"ok": success}
+    results: list[bool] = []
+    if text:
+        results.append(await send_meta_message(psid, text, platform=platform))
+    if image_url:
+        results.append(await send_meta_media(psid, image_url, platform=platform))
+
+    return {"ok": all(results), "sent": len(results)}
