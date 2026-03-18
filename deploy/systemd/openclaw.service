@@ -8,9 +8,11 @@ Type=simple
 User=root
 WorkingDirectory=/root/social-ai
 Environment=HOME=/root
-ExecStart=/usr/bin/env bash -lc 'openclaw gateway'
+ExecStart=/usr/bin/env bash -lc 'openclaw start --config /root/social-ai/config/openclaw.json'
 Restart=always
-RestartSec=5
+RestartSec=10
+StandardOutput=append:/root/social-ai/logs/openclaw.log
+StandardError=append:/root/social-ai/logs/openclaw.log
 
 [Install]
 WantedBy=multi-user.target
