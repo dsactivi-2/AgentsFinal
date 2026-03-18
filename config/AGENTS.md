@@ -102,6 +102,28 @@ Wenn Kontext-Limit erreicht:
 
 ---
 
+
+---
+
+## Modell-Routing (per Skill)
+
+Jeder Skill verwendet das für seine Aufgabe optimierte Ollama-Cloud-Modell.
+Fallback-Kette (global): `minimax-m2.5` → `kimi-k2.5` → `qwen3.5:397b`
+
+| Skill | Modell | Stärke |
+|---|---|---|
+| `ROLE:inbox` | `ollama/kimi-k2.5` | Schnelle Reaktion, mehrsprachig, Chat |
+| `ROLE:publisher` | `ollama/gemini-3-flash-preview` | Stabil, zuverlässig für API-Calls |
+| `ROLE:writer` | `ollama/minimax-m2.1` | Kreatives Schreiben, Mehrsprachigkeit |
+| `ROLE:lead-nurturing` | `ollama/minimax-m2.1` | Empathische Kommunikation |
+| `ROLE:planner` | `ollama/deepseek-v3.2` | Strategisches Denken, Planung |
+| `ROLE:reviewer` | `ollama/deepseek-v3.2` | Kritisches Prüfen, Qualitätssicherung |
+| `ROLE:analytics` | `ollama/deepseek-v3.2` | Datenanalyse, Mustererkennung |
+| `ROLE:optimizer` | `ollama/deepseek-v3.2` | Regeloptimierung, Strategie |
+| `ROLE:memory_critic` | `ollama/deepseek-v3.2` | Strukturiertes Gedächtnis-Audit |
+| `ROLE:escalation` | `ollama/nemotron-3-super` | Safety-aligned, sichere Eskalation |
+| `ROLE:reflexion` | `ollama/nemotron-3-super` | Meta-Kognition, Selbstreflexion |
+
 ## Rollendefinitionen
 
 Detaillierte Rollen-Logik (Trigger, Tasks, Output-Formate, Grenzen):
