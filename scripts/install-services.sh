@@ -57,14 +57,6 @@ preflight() {
         fi
     done
 
-    if ! command -v openclaw &>/dev/null; then
-        warn "openclaw nicht im PATH — openclaw.service wird trotzdem installiert, aber Start wird fehlschlagen falls openclaw nicht installiert ist."
-    fi
-
-    if [[ ! -f "${REPO_DIR}/config/openclaw.json" ]]; then
-        warn "config/openclaw.json nicht gefunden — OpenClaw startet ohne Konfiguration."
-    fi
-
     info "Service User: ${SERVICE_USER}"
     info "Service Group: ${SERVICE_GROUP}"
     info "Repo: ${REPO_DIR}"
@@ -112,34 +104,6 @@ EOF
     success "meta-bridge.service erstellt"
 }
 
-create_openclaw_unit() {
-    info "Erstelle openclaw.service..."
-
-    cat > "${SYSTEMD_DIR}/openclaw.service" << EOF
-[Unit]
-Description=OpenClaw Gateway
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=${REPO_DIR}
-Environment=HOME=/root
-ExecStart=/usr/bin/env bash -lc 'openclaw start --config ${REPO_DIR}/config/openclaw.json'
-Restart=always
-RestartSec=10
-StandardOutput=append:${LOG_DIR}/openclaw.log
-StandardError=append:${LOG_DIR}/openclaw.log
-SyslogIdentifier=openclaw
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    success "openclaw.service erstellt"
-}
-
 create_mem0_api_unit() {
     info "Erstelle mem0-api.service..."
 
@@ -183,7 +147,7 @@ enable_services() {
     systemctl daemon-reload
     success "daemon-reload OK"
 
-    for svc in openclaw meta-bridge mem0-api; do
+    for svc in meta-bridge mem0-api; do
         info "Aktiviere ${svc}..."
         systemctl enable "${svc}.service"
         success "${svc}: Autostart aktiviert"
@@ -193,7 +157,7 @@ enable_services() {
 start_services() {
     local restart_flag="${1:-start}"  # start | restart
 
-    for svc in openclaw meta-bridge mem0-api; do
+    for svc in meta-bridge mem0-api; do
         if systemctl is-active --quiet "${svc}.service" 2>/dev/null; then
             info "${svc} läuft bereits — führe restart durch..."
             systemctl restart "${svc}.service"
@@ -223,29 +187,24 @@ print_summary() {
     echo -e "${GREEN}══════════════════════════════════════════════${NC}"
     echo ""
     echo "Services:"
-    echo "  systemctl status openclaw      # OpenClaw Gateway"
-    echo "  systemctl status meta-bridge   # Port 8085"
-    echo "  systemctl status mem0-api      # Port 8010"
-    echo ""
-    echo "Dashboard URL (einmalig nach Start):"
-    echo "  openclaw dashboard --no-open"
+    echo "  systemctl status meta-bridge          # Port 8085"
+    echo "  systemctl status mem0-api             # Port 8010"
+    echo "  systemctl --user status openclaw-gateway  # OpenClaw (user-service)"
     echo ""
     echo "Logs:"
-    echo "  journalctl -u openclaw -f"
     echo "  journalctl -u meta-bridge -f"
     echo "  journalctl -u mem0-api -f"
-    echo "  tail -f ${LOG_DIR}/openclaw.log"
+    echo "  journalctl --user -u openclaw-gateway -f"
     echo "  tail -f ${LOG_DIR}/meta-bridge.log"
     echo "  tail -f ${LOG_DIR}/mem0-api.log"
     echo ""
     echo "Steuerung:"
-    echo "  systemctl restart openclaw"
     echo "  systemctl restart meta-bridge"
     echo "  systemctl restart mem0-api"
-    echo "  systemctl stop openclaw meta-bridge mem0-api"
+    echo "  systemctl --user restart openclaw-gateway"
     echo ""
     echo "Autostart deaktivieren:"
-    echo "  systemctl disable openclaw meta-bridge mem0-api"
+    echo "  systemctl disable meta-bridge mem0-api"
     echo ""
 }
 
@@ -259,7 +218,6 @@ main() {
     echo ""
 
     preflight
-    create_openclaw_unit
     create_meta_bridge_unit
     create_mem0_api_unit
     enable_services
