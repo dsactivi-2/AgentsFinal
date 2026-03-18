@@ -23,7 +23,6 @@ os.environ.setdefault("META_PAGE_ACCESS_TOKEN", "test_page_token")
 os.environ.setdefault("OPENCLAW_HOOK_URL", "http://127.0.0.1:18789/hooks/meta")
 os.environ.setdefault("SUPERMEMORY_API_KEY", "sm_test_key_1234567890")
 # Nicht-existente Ports → Connection Refused → Graceful Degradation
-os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:9999/0")
 os.environ.setdefault("DB_HOST", "127.0.0.1")
 os.environ.setdefault("DB_PORT", "9999")
 os.environ.setdefault("DB_NAME", "test_nonexistent")

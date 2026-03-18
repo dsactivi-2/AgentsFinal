@@ -50,8 +50,8 @@ async def test_health():
     data = resp.json()
     assert data["ok"] is True
     assert data["service"] == "meta-bridge"
-    assert "redis" in data
     assert "postgres" in data
+    assert "redis" not in data
 
 
 # ─── GET /webhook — Verifikation ──────────────────────────────────────────────
