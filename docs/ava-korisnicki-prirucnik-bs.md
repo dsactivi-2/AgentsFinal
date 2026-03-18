@@ -146,7 +146,7 @@ Ime modela: ollama/kimi-k2.5:cloud
 
 ### 🔄 Rezervni model 3 — Qwen 3.5 Uncensored Cloud
 ```
-Ime modela: ollama/leckminartor/qwen3.5-uncensored:397b-cloud
+Ime modela: ollama/qwen3.5:397b
 ```
 
 **Za šta se koristi:**
@@ -1177,7 +1177,7 @@ Napiši Avi:
 | `ollama/glm-5:cloud` | Primarni | Sve — planiranje, pisanje, chat, inbox |
 | `ollama/minimax-m2.5:cloud` | Rezerva 1 | Analize, dugi izvještaji |
 | `ollama/kimi-k2.5:cloud` | Rezerva 2 | Kreativno pisanje |
-| `ollama/qwen3.5-uncensored` | Rezerva 3 | Zadnja rezerva |
+| `ollama/qwen3.5:397b` | Rezerva 3 | Zadnja rezerva |
 | `qwen3.5:cloud` | Vision | Analiza slika |
 
 ---
