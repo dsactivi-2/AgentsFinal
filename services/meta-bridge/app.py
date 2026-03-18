@@ -30,9 +30,17 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
+import base64
 import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
+
+try:
+    from PIL import Image
+    import io
+    _HAS_PILLOW = True
+except ImportError:
+    _HAS_PILLOW = False
 
 # ─── Optionale Backends (graceful degradation) ───────────────────────────────
 
@@ -76,6 +84,10 @@ OPENCLAW_HOOK_URL: str = os.getenv(
     "OPENCLAW_HOOK_URL", "http://127.0.0.1:18789/hooks/meta"
 )
 META_GRAPH_URL: str = "https://graph.facebook.com/v19.0/me/messages"
+OLLAMA_CLOUD_API_KEY: str = os.getenv("OLLAMA_CLOUD_API_KEY", "")
+OLLAMA_CLOUD_API_BASE: str = os.getenv("OLLAMA_CLOUD_API_BASE", "https://ollama.com/api")
+VISION_MODEL: str = os.getenv("VISION_MODEL", "qwen3.5:cloud")
+VISION_ENABLED: bool = bool(OLLAMA_CLOUD_API_KEY)
 OPENCLAW_TIMEOUT: float = float(os.getenv("OPENCLAW_TIMEOUT", "45"))
 META_API_TIMEOUT: float = float(os.getenv("META_API_TIMEOUT", "10"))
 
@@ -316,6 +328,80 @@ async def _send_meta_with_retry(
     return False
 
 
+# ─── Vision: Bildbeschreibung via Ollama ─────────────────────────────────────
+
+async def _describe_image(image_url: str, page_token: str = "") -> str | None:
+    """
+    Downloads image from Meta CDN and sends to qwen3.5:cloud for description.
+    Returns text description or None on failure.
+    """
+    if not VISION_ENABLED or not _HAS_PILLOW:
+        return None
+    try:
+        # Download image (Meta URLs need page token)
+        params = {}
+        if page_token:
+            params["access_token"] = page_token
+        async with httpx.AsyncClient(timeout=15) as client:
+            img_resp = await client.get(image_url, params=params, follow_redirects=True)
+        if img_resp.status_code != 200:
+            log_error("vision_download_failed", status=img_resp.status_code, url=image_url[:60])
+            return None
+
+        # Resize with Pillow (max 1024px, JPEG)
+        img = Image.open(io.BytesIO(img_resp.content)).convert("RGB")
+        img.thumbnail((1024, 1024), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        img_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+        # Call qwen3.5:cloud via Ollama API
+        async with httpx.AsyncClient(timeout=30) as client:
+            vision_resp = await client.post(
+                f"{OLLAMA_CLOUD_API_BASE}/chat",
+                headers={"Authorization": f"Bearer {OLLAMA_CLOUD_API_KEY}"},
+                json={
+                    "model": VISION_MODEL,
+                    "messages": [{
+                        "role": "user",
+                        "content": "Describe this image in detail. What objects, people, text, or context do you see? Be specific and concise.",
+                        "images": [img_b64],
+                    }],
+                    "stream": False,
+                },
+            )
+        if vision_resp.status_code != 200:
+            log_error("vision_api_failed", status=vision_resp.status_code)
+            return None
+
+        description = vision_resp.json().get("message", {}).get("content", "").strip()
+        log("vision_ok", model=VISION_MODEL, chars=len(description))
+        return description or None
+
+    except Exception as exc:
+        log_error("vision_exception", error=str(exc))
+        return None
+
+
+async def _process_attachments(attachments: list) -> str:
+    """
+    Processes image attachments and returns combined text description.
+    Skips non-image attachments.
+    """
+    descriptions = []
+    for att in attachments:
+        att_type = att.get("type", "")
+        if att_type not in ("image", "photo"):
+            continue
+        url = att.get("payload", {}).get("url", "")
+        if not url:
+            continue
+        desc = await _describe_image(url, page_token=PAGE_ACCESS_TOKEN)
+        if desc:
+            descriptions.append(f"[Bild: {desc}]")
+    return " ".join(descriptions)
+
+
 # ─── Payload-Normalisierung ──────────────────────────────────────────────────
 
 def _extract_events(payload: dict) -> list[dict]:
@@ -363,11 +449,12 @@ def _extract_events(payload: dict) -> list[dict]:
             if not sender or not msg_id:
                 continue
 
+            attachments = msg.get("attachments", [])
             events.append({
                 "psid": sender,
                 "message_id": msg_id,
                 "text": text,
-                "attachments": [],
+                "attachments": attachments,
                 "platform": "instagram",
                 "object": obj_type,
             })
@@ -397,12 +484,25 @@ async def _process_event(event: dict, request_id: str) -> None:
         has_text=bool(event.get("text")),
     )
 
+    # Vision: Bilder verarbeiten bevor OpenClaw
+    image_text = ""
+    if event.get("attachments") and VISION_ENABLED:
+        image_text = await _process_attachments(event["attachments"])
+        if image_text:
+            log("vision_processed", request_id=request_id, chars=len(image_text))
+
+    # Kombinierten Text erstellen
+    raw_text = event.get("text", "") or ""
+    combined_text = raw_text
+    if image_text:
+        combined_text = (raw_text + "\n" + image_text).strip() if raw_text else image_text
+
     # Eingehende Nachricht in Postgres loggen
     await _log_message(
         psid,
         platform,
         "in",
-        event.get("text", "") or "[attachment]",
+        combined_text or "[attachment]",
         meta_message_id=event.get("message_id"),
         request_id=request_id,
     )
@@ -411,7 +511,7 @@ async def _process_event(event: dict, request_id: str) -> None:
         "request_id": request_id,
         "psid": psid,
         "platform": platform,
-        "text": event.get("text", ""),
+        "text": combined_text,
         "attachments": event.get("attachments", []),
         "message_id": event["message_id"],
     }

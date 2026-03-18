@@ -2,8 +2,12 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "anthropic/claude-sonnet-4-6",
-        "fallbacks": []
+        "primary": "ollama/glm-5:cloud",
+        "fallbacks": [
+          "ollama/minimax-m2.5:cloud",
+          "ollama/kimi-k2.5:cloud",
+          "ollama/leckminartor/qwen3.5-uncensored:397b-cloud"
+        ]
       },
       "workspace": "~/.openclaw/workspace-social-ai",
       "timeoutSeconds": 1800,
@@ -42,5 +46,13 @@
   },
   "logging": {
     "level": "info"
+  },
+  "gateway": {
+    "controlUi": {
+      "allowedOrigins": [
+        "https://marki.ds.activi.io",
+        "https://marki.tail47b17c.ts.net"
+      ]
+    }
   }
 }
