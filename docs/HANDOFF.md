@@ -40,7 +40,7 @@
 | Primär-Modell: `ollama/glm-5:cloud` | ✅ |
 | Fallback 1: `ollama/minimax-m2.5:cloud` | ✅ |
 | Fallback 2: `ollama/kimi-k2.5:cloud` | ✅ |
-| Fallback 3: `ollama/leckminartor/qwen3.5-uncensored:397b-cloud` | ✅ |
+| Fallback 3: `ollama/qwen3.5:397b` | ✅ |
 | Ollama Cloud API Key in systemd drop-in | ✅ |
 | Auth-Token konfiguriert | ✅ |
 

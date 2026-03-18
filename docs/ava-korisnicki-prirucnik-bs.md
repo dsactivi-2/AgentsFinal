@@ -133,7 +133,7 @@ Ime modela: ollama/kimi-k2.5:cloud
 
 ### 🔄 Rezervni model 2 — Qwen 3.5 Uncensored Cloud
 ```
-Ime modela: ollama/leckminartor/qwen3.5-uncensored:397b-cloud
+Ime modela: ollama/qwen3.5:397b
 ```
 
 **Za šta se koristi:**
