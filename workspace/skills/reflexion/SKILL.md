@@ -2,7 +2,7 @@
 name: Reflexion
 description: Wöchentliche Selbstanalyse aller 9 Rollen — Muster erkennen, Verbesserungen vorschlagen, Wochenbericht speichern
 ---
-
+## Modell: ollama/nemotron-3-super:cloud
 ## Trigger
 
 Cron: Sonntag 04:00 Europe/Berlin (`"0 4 * * 0"`)

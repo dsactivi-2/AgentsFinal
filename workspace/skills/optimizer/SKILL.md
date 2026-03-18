@@ -2,7 +2,7 @@
 name: Optimizer
 description: Datengetriebene Content-Optimierung
 ---
-
+## Modell: ollama/deepseek-v3.2:cloud
 # SKILL: Optimizer — Datengetriebene Content-Optimierung
 
 ## Aktivierung

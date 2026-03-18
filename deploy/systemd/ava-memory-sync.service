@@ -1,0 +1,11 @@
+[Unit]
+Description=Ava Memory Autosave — OpenClaw Workspace → Supermemory
+After=network-online.target mem0-api.service
+Requires=mem0-api.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/root/social-ai/scripts/ava-memory-sync.sh
+StandardOutput=append:/root/social-ai/logs/ava-memory-sync.log
+StandardError=append:/root/social-ai/logs/ava-memory-sync.log

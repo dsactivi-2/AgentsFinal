@@ -2,7 +2,7 @@
 name: Analytics
 description: Performance-Analyse & Insights für Social Media
 ---
-
+## Modell: ollama/deepseek-v3.2:cloud
 # SKILL: Analytics — Performance-Analyse & Insights
 
 ## Aktivierung

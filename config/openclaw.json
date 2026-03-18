@@ -5,13 +5,30 @@
         "primary": "ollama/minimax-m2.5:cloud",
         "fallbacks": [
           "ollama/kimi-k2.5:cloud",
-          "ollama/leckminartor/qwen3.5-uncensored:397b-cloud"
+          "ollama/deepseek-v3.2:cloud"
         ]
       },
       "workspace": "~/.openclaw/workspace-social-ai",
       "timeoutSeconds": 1800,
       "heartbeat": {
         "every": "60m"
+      },
+      "models": {
+        "ollama/minimax-m2.5:cloud": {
+          "alias": "minimax (default)"
+        },
+        "ollama/kimi-k2.5:cloud": {
+          "alias": "kimi (inbox/vision)"
+        },
+        "ollama/gemini-3-flash-preview:cloud": {
+          "alias": "gemini-flash (publisher)"
+        },
+        "ollama/deepseek-v3.2:cloud": {
+          "alias": "deepseek (reasoning)"
+        },
+        "ollama/nemotron-3-super:cloud": {
+          "alias": "nemotron (thinking)"
+        }
       }
     }
   },
@@ -49,17 +66,22 @@
   "gateway": {
     "mode": "local",
     "bind": "loopback",
-    "trustedProxies": ["127.0.0.1"],
-    "reload": { "mode": "hybrid" },
+    "trustedProxies": [
+      "127.0.0.1"
+    ],
+    "reload": {
+      "mode": "hybrid"
+    },
     "controlUi": {
       "allowedOrigins": [
-        "https://YOUR_DOMAIN",
-        "https://YOUR_TAILSCALE_DOMAIN.ts.net"
+        "https://oc.marki.ac.activi.io",
+        "https://hetzner4-marki.tail47b17c.ts.net",
+        "https://mit.tail47b17c.ts.net"
       ]
     },
     "auth": {
       "mode": "token",
-      "token": "REPLACE_WITH_STRONG_TOKEN"
+      "token": "5d936f9c51be19d5d6b912092dd7dd2573e3a11f3d2c2d5de028f7c08804585f"
     }
   }
 }

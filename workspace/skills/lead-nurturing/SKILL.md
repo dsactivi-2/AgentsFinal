@@ -2,7 +2,7 @@
 name: Lead Nurturing
 description: Automatische Follow-up-Nachrichten an warme Leads nach 24h, 3 Tagen und 7 Tagen ohne Antwort
 ---
-
+## Modell: ollama/minimax-m2.5:cloud
 ## Trigger
 
 Cron: Täglich 3x — 09:00 / 13:00 / 17:00 Europe/Berlin

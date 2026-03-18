@@ -2,7 +2,7 @@
 name: Escalation
 description: Human-Handover & Krisenmanagement
 ---
-
+## Modell: ollama/nemotron-3-super:cloud
 # SKILL: Escalation — Human-Handover & Krisenmanagement
 
 ## Aktivierung

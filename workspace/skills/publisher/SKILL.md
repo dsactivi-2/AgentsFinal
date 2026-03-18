@@ -2,7 +2,7 @@
 name: Publisher
 description: Post-Veröffentlichung via Postiz
 ---
-
+## Modell: ollama/gemini-3-flash-preview:cloud
 # SKILL: Publisher — Post-Veröffentlichung via Postiz
 
 ## Aktivierung

@@ -2,7 +2,7 @@
 name: Planner
 description: Content-Strategie & Kampagnenplanung
 ---
-
+## Modell: ollama/deepseek-v3.2:cloud
 # SKILL: Planner — Content-Strategie & Kampagnenplanung
 
 ## Aktivierung

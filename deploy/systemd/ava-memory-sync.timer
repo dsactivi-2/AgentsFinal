@@ -1,0 +1,11 @@
+[Unit]
+Description=Ava Memory Autosave Timer — alle 15 Minuten
+Requires=ava-memory-sync.service
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

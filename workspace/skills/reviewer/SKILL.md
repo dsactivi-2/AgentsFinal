@@ -2,7 +2,7 @@
 name: Reviewer
 description: Qualitätssicherung & Risikobewertung
 ---
-
+## Modell: ollama/deepseek-v3.2:cloud
 # SKILL: Reviewer — Qualitätssicherung & Risikobewertung
 
 ## Aktivierung

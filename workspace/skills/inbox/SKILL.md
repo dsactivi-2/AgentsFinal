@@ -2,7 +2,7 @@
 name: Inbox
 description: Eingehende Nachrichten verarbeiten und routen
 ---
-
+## Modell: ollama/kimi-k2.5:cloud
 # SKILL: Inbox — Eingehende Nachrichten verarbeiten
 
 ## Aktivierung

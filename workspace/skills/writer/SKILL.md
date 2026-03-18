@@ -2,7 +2,7 @@
 name: Writer
 description: Content-Erstellung & Textvarianten in 4 Sprachen
 ---
-
+## Modell: ollama/minimax-m2.5:cloud
 # SKILL: Writer — Content-Erstellung & Textvarianten
 
 ## Aktivierung
