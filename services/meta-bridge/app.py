@@ -39,7 +39,7 @@ from typing import Any
 
 import base64
 import httpx
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 
 try:
@@ -723,9 +723,9 @@ async def get_errors(limit: int = 50) -> dict:
 
 @app.get("/webhook", response_class=PlainTextResponse)
 async def verify_webhook(
-    hub_mode: str = "",
-    hub_verify_token: str = "",
-    hub_challenge: str = "",
+    hub_mode: str = Query(default="", alias="hub.mode"),
+    hub_verify_token: str = Query(default="", alias="hub.verify_token"),
+    hub_challenge: str = Query(default="", alias="hub.challenge"),
 ) -> str:
     """Meta Webhook-Verifikation (Subscribe-Flow)."""
     if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
