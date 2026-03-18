@@ -223,7 +223,7 @@ Was du siehst: Technische Einstellungen für Ava.
 
 Öffne das Dashboard → Klicke links auf **"Chat"**
 
-Du siehst oben **"main"** (das ist Ava) und das Modell **"glm-5:cloud"**
+Du siehst oben **"main"** (das ist Ava) und das Modell **"minimax-m2.5:cloud"**
 
 Schreibe deine Nachricht unten und drücke Enter.
 

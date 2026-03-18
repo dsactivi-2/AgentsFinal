@@ -141,7 +141,7 @@ Nach dem Login:
 - **Direkter Chat mit Ava**
 - Schreibe Befehle wie: `"Was posten wir diese Woche?"`, `"Erstelle einen Plan für Ramadan"`
 - Ava antwortet und führt Aktionen aus
-- Modell: `glm-5:cloud` (Standard)
+- Modell: `minimax-m2.5:cloud` (Standard)
 
 #### Übersicht (Dashboard)
 - Zeigt aktive Sessions, letzte Nachrichten, Systemstatus
