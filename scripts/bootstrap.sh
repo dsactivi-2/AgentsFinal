@@ -38,9 +38,39 @@ check_cmd() {
     fi
 }
 
+# Memory variant: B=Supermemory Cloud (default), A=Self-Hosted Qdrant/Neo4j
+MEMORY_VARIANT="B"
+
 # =============================================================================
 # Setup-Schritte
 # =============================================================================
+
+select_memory_variant() {
+    echo ""
+    echo -e "${BLUE}┌─────────────────────────────────────────────┐${NC}"
+    echo -e "${BLUE}│  Memory Backend wählen                      │${NC}"
+    echo -e "${BLUE}├─────────────────────────────────────────────┤${NC}"
+    echo -e "${BLUE}│  A) Self-Hosted  — Qdrant + Neo4j + Ollama  │${NC}"
+    echo -e "${BLUE}│     DSGVO-konform, €0/Monat, 50× schneller  │${NC}"
+    echo -e "${BLUE}│     Benötigt: Docker + Ollama auf dem Server │${NC}"
+    echo -e "${BLUE}│                                             │${NC}"
+    echo -e "${BLUE}│  B) Supermemory Cloud (Standard)            │${NC}"
+    echo -e "${BLUE}│     Schnelles Setup, \$19/Monat              │${NC}"
+    echo -e "${BLUE}│     Benötigt: SUPERMEMORY_API_KEY           │${NC}"
+    echo -e "${BLUE}└─────────────────────────────────────────────┘${NC}"
+    echo ""
+    local choice
+    read -r -t 30 -p "Variante [A/B, Standard: B]: " choice || choice="B"
+    choice="${choice:-B}"
+    MEMORY_VARIANT="${choice^^}"
+
+    if [[ "${MEMORY_VARIANT}" == "A" ]]; then
+        success "Memory Variant A gewählt: Self-Hosted (Qdrant + Neo4j)"
+    else
+        MEMORY_VARIANT="B"
+        success "Memory Variant B gewählt: Supermemory Cloud"
+    fi
+}
 
 setup_dirs() {
     info "Verzeichnisse anlegen..."
@@ -86,7 +116,11 @@ check_env() {
         fi
     }
 
-    check_var "SUPERMEMORY_API_KEY"    "Supermemory API Key"
+    if [[ "${MEMORY_VARIANT}" == "A" ]]; then
+        check_var "NEO4J_PASSWORD"         "Neo4j Passwort (Variant A)"
+    else
+        check_var "SUPERMEMORY_API_KEY"    "Supermemory API Key (Variant B)"
+    fi
     check_var "META_APP_SECRET"        "Meta App Secret"
     check_var "META_VERIFY_TOKEN"      "Meta Webhook Verify Token"
     check_var "META_PAGE_ACCESS_TOKEN" "Meta Page Access Token"
@@ -117,6 +151,20 @@ setup_venv() {
 
     [[ -d "${svc_dir}" ]] || die "Service-Verzeichnis fehlt: ${svc_dir}"
 
+    # mem0-api: Variant A/B entscheiden welche app.py + requirements.txt aktiv ist
+    if [[ "${svc}" == "mem0-api" ]]; then
+        if [[ "${MEMORY_VARIANT}" == "A" ]]; then
+            info "mem0-api: Aktiviere Variant A (Self-Hosted)..."
+            cp "${svc_dir}/app_selfhosted.py" "${svc_dir}/app.py"
+            cp "${svc_dir}/requirements_selfhosted.txt" "${svc_dir}/requirements.txt"
+            success "mem0-api: app.py = Variant A (Qdrant + Neo4j)"
+        else
+            info "mem0-api: Aktiviere Variant B (Supermemory)..."
+            # app.py ist bereits die Supermemory-Version (Repo-Default)
+            success "mem0-api: app.py = Variant B (Supermemory)"
+        fi
+    fi
+
     cd "${svc_dir}"
     if [[ ! -d "venv" ]]; then
         python3 -m venv venv
@@ -128,6 +176,38 @@ setup_venv() {
     deactivate
     cd "${REPO_DIR}"
     success "${svc} venv bereit"
+}
+
+setup_memory_docker() {
+    [[ "${MEMORY_VARIANT}" == "A" ]] || return 0
+
+    info "Variant A: Qdrant + Neo4j via Docker starten..."
+
+    if ! command -v docker &>/dev/null; then
+        warn "docker nicht gefunden — Qdrant/Neo4j manuell starten:"
+        warn "  docker compose -f deploy/docker-compose.memory.yml up -d"
+        return 0
+    fi
+
+    if ! docker info &>/dev/null 2>&1; then
+        warn "Docker Daemon nicht erreichbar — Qdrant/Neo4j manuell starten:"
+        warn "  docker compose -f deploy/docker-compose.memory.yml up -d"
+        return 0
+    fi
+
+    local compose_file="${REPO_DIR}/deploy/docker-compose.memory.yml"
+
+    if [[ -z "${NEO4J_PASSWORD:-}" ]]; then
+        warn "NEO4J_PASSWORD nicht gesetzt — Qdrant/Neo4j manuell starten:"
+        warn "  export NEO4J_PASSWORD=<dein-passwort>"
+        warn "  docker compose -f deploy/docker-compose.memory.yml up -d"
+        return 0
+    fi
+
+    # NEO4J_PASSWORD ist bereits im Environment — docker compose liest es automatisch
+    docker compose -f "${compose_file}" up -d \
+        && success "Qdrant + Neo4j gestartet" \
+        || warn "Docker Compose fehlgeschlagen — manuell: docker compose -f deploy/docker-compose.memory.yml up -d"
 }
 
 setup_postgres() {
@@ -315,6 +395,7 @@ print_summary() {
     echo ""
     echo -e "${GREEN}================================================${NC}"
     echo -e "${GREEN}  Social AI Stack — Bootstrap abgeschlossen!${NC}"
+    echo -e "${GREEN}  Memory Variant: ${MEMORY_VARIANT}${NC}"
     echo -e "${GREEN}================================================${NC}"
     echo ""
     echo "Nächste Schritte:"
@@ -322,6 +403,15 @@ print_summary() {
     echo "1. .env Dateien ausfüllen:"
     echo "   nano services/meta-bridge/.env"
     echo "   nano services/mem0-api/.env"
+    if [[ "${MEMORY_VARIANT}" == "A" ]]; then
+        echo ""
+        echo "   Variant A: Folgende Vars in services/mem0-api/.env setzen:"
+        echo "   NEO4J_URL, NEO4J_USER, NEO4J_PASSWORD, OLLAMA_BASE"
+        echo "   MEM0_LLM_MODEL, MEM0_EMBED_MODEL"
+        echo ""
+        echo "   Ollama Embedding-Modell installieren:"
+        echo "   ollama pull bge-m3"
+    fi
     echo ""
     echo "2. Services starten:"
     echo "   ./scripts/start-mem0-api.sh     # Port 8010 — PID: /tmp/mem0-api.pid"
@@ -339,8 +429,9 @@ print_summary() {
     echo "   ./scripts/healthcheck.sh"
     echo ""
     echo "5. Meta Webhook:"
-    echo "   Callback URL: https://[deine-domain]/webhook"
+    echo "   Callback URL: https://[deine-domain]/hooks/meta"
     echo "   Verify Token: \$META_VERIFY_TOKEN"
+    echo "   → Vollständige Anleitung: docs/POST_INSTALL.md"
     echo ""
     echo "6. Logs:"
     echo "   tail -f logs/bootstrap.log"
@@ -363,10 +454,12 @@ main() {
 
     setup_dirs
     preflight_checks
+    select_memory_variant
     check_env
     setup_env_files
     setup_venv "meta-bridge"
     setup_venv "mem0-api"
+    setup_memory_docker
     setup_postgres
     setup_openclaw
     create_start_scripts

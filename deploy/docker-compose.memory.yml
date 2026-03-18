@@ -1,0 +1,65 @@
+# docker-compose.memory.yml
+# Variant A: Self-Hosted Memory Backend
+# Startet Qdrant (vector store) + Neo4j (graph store)
+#
+# Voraussetzung: NEO4J_PASSWORD als Umgebungsvariable gesetzt
+#   export NEO4J_PASSWORD=<dein-passwort>
+#
+# Starten:
+#   docker compose -f deploy/docker-compose.memory.yml up -d
+#
+# Stoppen:
+#   docker compose -f deploy/docker-compose.memory.yml down
+#
+# Ports nach außen: KEINER — nur localhost-Binding
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.13.3
+    container_name: social-ai-qdrant
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"   # REST API
+      - "127.0.0.1:6334:6334"   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:6333/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: social-ai-neo4j
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7474:7474"   # Web-UI (optional, nur lokal)
+      - "127.0.0.1:7687:7687"   # Bolt (mem0 verbindet hier)
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD}"
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+      NEO4J_dbms_memory_heap_initial__size: "256m"
+      NEO4J_dbms_memory_heap_max__size: "512m"
+      NEO4J_dbms_memory_pagecache_size: "128m"
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  qdrant_data:
+    name: social-ai-qdrant-data
+  neo4j_data:
+    name: social-ai-neo4j-data
+  neo4j_logs:
+    name: social-ai-neo4j-logs
