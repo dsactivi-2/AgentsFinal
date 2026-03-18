@@ -2,8 +2,9 @@
 Meta Bridge v2 — Bidirektionale Meta Webhook Bridge für Facebook/Instagram/Messenger.
 
 Neu in v2:
-  - Redis: Persistente Deduplizierung (SETNX + TTL) + graceful fallback auf In-Memory
+  - Postgres: Deduplizierung via processed_events-Tabelle (PRIMARY KEY = kein Duplikat möglich)
   - Postgres: Nachrichten-Logging (messages-Tabelle) + graceful fallback
+  - Redis: Optionaler Fallback für Dedup wenn Postgres nicht verfügbar
   - Beide Backends sind optional; Bridge läuft auch ohne sie.
 
 Neu in v2.1:
@@ -159,25 +160,39 @@ async def lifespan(app: FastAPI):
 async def _is_duplicate(message_id: str) -> bool:
     """
     Prüft ob message_id bereits verarbeitet wurde.
-    Primär: Redis SETNX + TTL (persistent, überlebt Restarts).
-    Fallback: In-Memory TTL-Dict (geht bei Restart verloren).
+    Primär: PostgreSQL INSERT ON CONFLICT (persistent, überlebt Restarts, kein TTL nötig).
+    Fallback 1: Redis SETNX + TTL (wenn Postgres nicht verfügbar).
+    Fallback 2: In-Memory TTL-Dict (wenn beide nicht verfügbar).
     """
+    # ── Primär: PostgreSQL ────────────────────────────────────────────────────
+    if db_pool:
+        try:
+            async with db_pool.acquire() as conn:
+                result = await conn.execute(
+                    "INSERT INTO processed_events(message_id) VALUES($1) ON CONFLICT DO NOTHING",
+                    message_id,
+                )
+                # result = "INSERT 0 1" → neu (kein Duplikat)
+                # result = "INSERT 0 0" → Konflikt (Duplikat)
+                return result == "INSERT 0 0"
+        except Exception as exc:
+            log_error("pg_dedup_error", error=str(exc))
+            # Fall through zu Redis
+
+    # ── Fallback 1: Redis ─────────────────────────────────────────────────────
     if redis_client:
         try:
             result = await redis_client.set(
                 f"meta:dedup:{message_id}",
                 "1",
-                nx=True,    # Only set if Not eXists
+                nx=True,
                 ex=DEDUP_TTL,
             )
-            # result=True → Key neu gesetzt (nicht Duplikat)
-            # result=None → Key existierte bereits (Duplikat)
             return result is None
         except Exception as exc:
             log_error("redis_dedup_error", error=str(exc))
-            # Fall through zu In-Memory
 
-    # In-Memory Fallback
+    # ── Fallback 2: In-Memory ─────────────────────────────────────────────────
     now = time.monotonic()
     expired = [k for k, t in _seen_ids.items() if now - t > DEDUP_TTL]
     for k in expired:

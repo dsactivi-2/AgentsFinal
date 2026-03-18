@@ -178,6 +178,29 @@ setup_venv() {
     success "${svc} venv bereit"
 }
 
+setup_ollama_models() {
+    [[ "${MEMORY_VARIANT}" == "A" ]] || return 0
+
+    info "Variant A: Ollama Embedding-Modell bge-m3 laden..."
+
+    if ! command -v ollama &>/dev/null; then
+        warn "ollama nicht gefunden — bge-m3 manuell laden:"
+        warn "  ollama pull bge-m3"
+        return 0
+    fi
+
+    if ollama list 2>/dev/null | grep -q "bge-m3"; then
+        success "bge-m3 bereits vorhanden"
+    else
+        info "Lade bge-m3 (ca. 1.2 GB, einmalig)..."
+        if ollama pull bge-m3; then
+            success "bge-m3 geladen"
+        else
+            warn "ollama pull bge-m3 fehlgeschlagen — manuell nachholen: ollama pull bge-m3"
+        fi
+    fi
+}
+
 setup_memory_docker() {
     [[ "${MEMORY_VARIANT}" == "A" ]] || return 0
 
@@ -459,6 +482,7 @@ main() {
     setup_env_files
     setup_venv "meta-bridge"
     setup_venv "mem0-api"
+    setup_ollama_models
     setup_memory_docker
     setup_postgres
     setup_openclaw

@@ -256,6 +256,20 @@ CREATE INDEX IF NOT EXISTS idx_error_logs_service_time ON error_logs(service, cr
 CREATE INDEX IF NOT EXISTS idx_error_logs_type_resolved ON error_logs(error_type, resolved);
 
 -- =============================================================================
+-- processed_events — Deduplizierung eingehender Meta-Webhook-Events
+-- =============================================================================
+-- Primärer Dedup-Store (ersetzt Redis für meta-bridge).
+-- Redis wird für diesen Stack nicht mehr benötigt.
+-- Cleanup (täglich via Cron empfohlen):
+--   DELETE FROM processed_events WHERE processed_at < NOW() - INTERVAL '24 hours';
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS processed_events (
+    message_id   TEXT        PRIMARY KEY,
+    processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_processed_events_time ON processed_events(processed_at DESC);
+
+-- =============================================================================
 -- Kommentare / Abschluss
 -- =============================================================================
 COMMENT ON TABLE messages IS 'Alle ein- und ausgehenden Nachrichten über alle Plattformen';

@@ -108,4 +108,4 @@ Detaillierte Rollen-Logik (Trigger, Tasks, Output-Formate, Grenzen):
 → `workspace/skills/{name}/SKILL.md`
 
 Architektur-Spezifikation (Quality Criteria, Error Behavior, DoD):
-→ `docs/AGENTS.md`
+→ `docs/ARCHITECTURE.md`
